@@ -1,44 +1,34 @@
-class Platform {
-  constructor() {
-    if (new.target === Platform) {
-      throw new TypeError("Cannot construct Platform instances directly");
-    }
-    this.createService = () => {
-      throw new Error("createService method must be implemented");
-    };
-    this.createWorkflow = () => {
-      throw new Error("createWorkflow method must be implemented");
-    };
-    this.createPipeline = () => {
-      throw new Error("createPipeline method must be implemented");
-    };
-  }
-}
-
-class Ansible extends Platform {
-  createService(service) {
-    console.log(`Creating service on Ansible: ${service}`);
-  }
-  createWorkflow(workflow) {
-    console.log(`Creating workflow on Ansible: ${workflow}`);
-  }
-  createPipeline(pipeline) {
-    console.log(`Creating pipeline on Ansible: ${pipeline}`);
-  }
-}
-
-class PlatformFactory {
-  static getPlatform(name) {
-    switch (name) {
-      case "Ansible":
-        return new Ansible();
-      default:
-        throw new Error("Invalid platform name");
-    }
-  }
-}
-
-// Usage
-const ansible = PlatformFactory.getPlatform("Ansible");
-ansible.createService("User Authentication"); // Output: "Creating service on Ansible: User Authentication"
-ansible.createWorkflow("Data Analysis"); // Output: "Creating workflow on Ans
+  - name: post-curl
+    image: curlimages/curl
+    command: ['sh', '-c']
+    args:
+    - |
+      curl -X POST -d "$(inputs.params.data)" "$(inputs.params.endpoint)"
+      status=$?
+      retries=0
+      while [ $status -ne 0 -a $retries -lt $(inputs.params.retries) ]; do
+        sleep $(inputs.params.timeout)
+        curl -X POST -d "$(inputs.params.data)" "$(inputs.params.endpoint)"
+        status=$?
+        retries=$((retries+1))
+      done
+      if [ $status -ne 0 ]; then
+        echo "POST operation failed after $(inputs.params.retries) retries"
+        exit $status
+      fi
+  outputs:
+    resources:
+    - name: status
+      type: integer
+      
+      
+          - name: is_static
+      description: whether the chart is static or not
+      
+         - |
+      if [ "$(inputs.params.is_static)" = "yes" ]; then
+        echo "performing task for chart: $(inputs.params.chart_name)"
+        # Perform task here
+      else
+        echo "Skipping task for chart: $(inputs.params.chart_name)"
+      fi
