@@ -1,34 +1,29 @@
-  - name: post-curl
-    image: curlimages/curl
-    command: ['sh', '-c']
-    args:
-    - |
-      curl -X POST -d "$(inputs.params.data)" "$(inputs.params.endpoint)"
-      status=$?
-      retries=0
-      while [ $status -ne 0 -a $retries -lt $(inputs.params.retries) ]; do
-        sleep $(inputs.params.timeout)
-        curl -X POST -d "$(inputs.params.data)" "$(inputs.params.endpoint)"
-        status=$?
-        retries=$((retries+1))
-      done
-      if [ $status -ne 0 ]; then
-        echo "POST operation failed after $(inputs.params.retries) retries"
-        exit $status
-      fi
-  outputs:
-    resources:
-    - name: status
-      type: integer
-      
-      
-          - name: is_static
-      description: whether the chart is static or not
-      
-         - |
-      if [ "$(inputs.params.is_static)" = "yes" ]; then
-        echo "performing task for chart: $(inputs.params.chart_name)"
-        # Perform task here
-      else
-        echo "Skipping task for chart: $(inputs.params.chart_name)"
-      fi
+#!/bin/bash
+
+# Fetch the new Jenkins Docker image and agent from OpenShift
+oc login <OpenShift_URL> -u <username> -p $OPENSHIFT_PASSWORD
+oc project <project_name>
+oc import-image jenkins:latest --from=<openshift_repo>/jenkins:latest --confirm
+oc import-image jenkins-agent-python:latest --from=<openshift_repo>/jenkins-agent-python:latest --confirm
+oc import-image jenkins-agent-java:latest --from=<openshift_repo>/jenkins-agent-java:latest --confirm
+
+# Start a Jenkins pod using the new image
+oc new-app jenkins:latest
+
+# Validate that the Jenkins pod is running
+if oc get pod | grep -q "jenkins.*Running"; then
+    echo "Jenkins is running"
+else
+    echo "Error: Jenkins is not running"
+    exit 1
+fi
+
+# Run a Python build using the new agent
+oc new-build --name=python-build --image-stream=python:latest --binary
+oc start-build python-build --from-dir=. --follow
+
+# Run a Java build using the new agent
+oc new-build --name=java-build --image-stream=java:latest --binary
+oc start-build java-build --from-dir=. --follow
+
+export OPENSHIFT_PASSWORD=your_password
