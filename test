@@ -27,3 +27,16 @@ oc new-build --name=java-build --image-stream=java:latest --binary
 oc start-build java-build --from-dir=. --follow
 
 export OPENSHIFT_PASSWORD=your_password
+
+
+    post {
+        always {
+            script {
+                if (currentBuild.result == 'FAILURE') {
+                    // Send an email notification on build failure
+                    def mail = 'mail -s "Build Failed: ${currentBuild.fullDisplayName}" recipient@example.com < message.txt'
+                    sh mail
+                }
+            }
+        }
+    }
