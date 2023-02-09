@@ -29,14 +29,22 @@ oc start-build java-build --from-dir=. --follow
 export OPENSHIFT_PASSWORD=your_password
 
 
-    post {
-        always {
-            script {
-                if (currentBuild.result == 'FAILURE') {
-                    // Send an email notification on build failure
-                    def mail = 'mail -s "Build Failed: ${currentBuild.fullDisplayName}" recipient@example.com < message.txt'
-                    sh mail
-                }
-            }
-        }
-    }
+import os
+
+def compare_files(dir1, dir2):
+    differences = {}
+    for filename in os.listdir(dir1):
+        file1_path = os.path.join(dir1, filename)
+        file2_path = os.path.join(dir2, filename)
+        if os.path.isfile(file1_path) and os.path.isfile(file2_path):
+            with open(file1_path) as file1, open(file2_path) as file2:
+                lines1 = file1.readlines()
+                lines2 = file2.readlines()
+                if lines1 != lines2:
+                    differences[filename] = [line for line in lines1 if line not in lines2]
+    return differences
+
+dir1 = "/path/to/dir1"
+dir2 = "/path/to/dir2"
+differences = compare_files(dir1, dir2)
+print(differences)
