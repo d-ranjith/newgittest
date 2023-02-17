@@ -168,3 +168,102 @@ helm upgrade --install my-workflow harness-charts/workflows/my_workflow -f my-wo
 # Override values for the "my_pipeline" pipeline
 helm upgrade --install my-pipeline harness-charts/pipelines/my_pipeline -f my-pipeline-values.yaml
 
+
+
+charts/oracle/Chart.yaml
+
+apiVersion: v2
+name: oracle
+description: Helm chart for deploying Oracle
+version: 0.1.0
+
+charts/oracle/values.yaml
+
+database:
+  driver: "oracle.jdbc.driver.OracleDriver"
+  url: "jdbc:oracle:thin:@//mydatabase.host.com:1521/ORCLCDB"
+  username: "myuser"
+  password: "mypassword"
+
+charts/oracle/templates/service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: oracle
+spec:
+  ports:
+    - name: oracle
+      port: 1521
+  selector:
+    app: oracle
+
+charts/oracle/templates/workflow.yaml
+
+apiVersion: harness.io/v1
+kind: Workflow
+metadata:
+  name: oracle-workflow
+  annotations:
+    description: Workflow for deploying Oracle
+spec:
+  applicationId: {{ .Values.applicationId }}
+  pipelineStages:
+  - type: DEPLOY
+    name: deploy-oracle
+    deployStage:
+      accountName: {{ .Values.accountName }}
+      strategy: ROLLING
+      overrideValuesYaml: |
+        image:
+          repository: my-artifactory-instance.com/my-organization/oracle-chart
+          tag: {{ .Values.chartVersion }}
+      clusters:
+      - clusterName: {{ .Values.clusterName }}
+  triggers:
+  - type: MANUAL
+
+
+
+charts/oracle/templates/pipeline.yaml
+
+apiVersion: harness.io/v1
+kind: Pipeline
+metadata:
+  name: oracle-pipeline
+  annotations:
+    description: Pipeline for deploying Oracle using Kubernetes and Helm
+spec:
+  applicationId: {{ .Values.applicationId }}
+  pipelineStages:
+  - type: DEPLOY
+    name: deploy-oracle
+    deployStage:
+      accountName: {{ .Values.accountName }}
+      strategy: ROLLING
+      overrideValuesYaml: |
+        image:
+          repository: my-artifactory-instance.com/my-organization/oracle-chart
+          tag: {{ .Values.chartVersion }}
+      clusters:
+      - clusterName: {{ .Values.clusterName }}
+  - type: DEPLOY
+    name: deploy-oracle-service
+    deployStage:
+      accountName: {{ .Values.accountName }}
+      strategy: ROLLING
+      overrides: |
+        {
+          "service": {
+            "values": {
+              "image": {
+                "repository": "my-artifactory-instance.com/my-organization/oracle-service-chart",
+                "tag": "{{ .Values.serviceChartVersion }}"
+              }
+            }
+          }
+        }
+      clusters:
+      - clusterName: {{ .Values.clusterName }}
+  triggers:
+  - type: MANUAL
