@@ -48,3 +48,73 @@ dir1 = "/path/to/dir1"
 dir2 = "/path/to/dir2"
 differences = compare_files(dir1, dir2)
 print(differences)
+-----
+
+
+harness-charts/
+├── environments/
+│   ├── values.yaml
+│   ├── prod.yaml
+│   ├── stage.yaml
+│   └── test.yaml
+├── services/
+│   ├── values.yaml
+│   ├── db/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── deployment.yaml
+│   │       ├── service.yaml
+│   │       └── ...
+│   ├── snowflake/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── deployment.yaml
+│   │       ├── service.yaml
+│   │       └── ...
+│   ├── batch/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── job.yaml
+│   │       ├── ...
+│   └── ansible/
+│       ├── Chart.yaml
+│       ├── values.yaml
+│       └── templates/
+│           ├── deployment.yaml
+│           ├── ...
+├── workflows/
+│   ├── values.yaml
+│   ├── my_workflow/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── steps.yaml
+│   │       ├── ...
+│   ├── another_workflow/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── steps.yaml
+│   │       ├── ...
+│   └── ...
+├── pipelines/
+│   ├── values.yaml
+│   ├── my_pipeline/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── stages.yaml
+│   │       ├── ...
+│   ├── another_pipeline/
+│   │   ├── Chart.yaml
+│   │   ├── values.yaml
+│   │   └── templates/
+│   │       ├── stages.yaml
+│   │       ├── ...
+│   └── ...
+└── ...
+
+
