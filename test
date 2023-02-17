@@ -117,4 +117,54 @@ harness-charts/
 │   └── ...
 └── ...
 
+harness-charts/
+├── charts/
+│   ├── snowflake/
+│   │   ├── Chart.yaml
+│   │   ├── templates/
+│   │   │   ├── service.yaml
+│   │   │   ├── workflow.yaml
+│   │   │   ├── pipeline.yaml
+│   │   ├── values.yaml
+│   ├── database/
+│   │   ├── Chart.yaml
+│   │   ├── templates/
+│   │   │   ├── service.yaml
+│   │   │   ├── workflow.yaml
+│   │   │   ├── pipeline.yaml
+│   │   ├── values.yaml
+├── environments/
+│   ├── values.yaml
+│   ├── dev.yaml
+│   ├── test.yaml
+│   ├── prod.yaml
+├── values.yaml
+
+
+The charts folder contains subfolders for each deployment type: snowflake and database. Each of these subfolders has a Chart.yaml file to define the chart metadata, a values.yaml file to define the default values for that deployment type, and a templates folder that contains the Kubernetes manifests for the services, workflows, and pipelines.
+
+The environments folder contains YAML files for each environment, including a values.yaml file that defines the default values for all environments. The adopting user can override these default values by creating a separate YAML file for each environment (e.g., dev.yaml, test.yaml, prod.yaml) and specifying the overrides there.
+
+Here's an example of what the snowflake/values.yaml file might look like for a contributor managing the Snowflake deployment type:
+
+And here's an example of what the database/values.yaml file might look like for a contributor managing the database deployment type:
+database:
+  driver: "oracle.jdbc.driver.OracleDriver"
+  url: "jdbc:oracle:thin:@//mydatabase.host.com:1521/ORCLCDB"
+  username: "myuser"
+  password: "mypassword"
+
+
+
+
+
+
+# Override values for the DB service
+helm upgrade --install db-service harness-charts/services/db -f my-db-values.yaml
+
+# Override values for the "my_workflow" workflow
+helm upgrade --install my-workflow harness-charts/workflows/my_workflow -f my-workflow-values.yaml
+
+# Override values for the "my_pipeline" pipeline
+helm upgrade --install my-pipeline harness-charts/pipelines/my_pipeline -f my-pipeline-values.yaml
 
