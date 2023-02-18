@@ -267,3 +267,61 @@ spec:
       - clusterName: {{ .Values.clusterName }}
   triggers:
   - type: MANUAL
+
+
+
+---
+
+
+
+const axios = require('axios');
+const fs = require('fs');
+const { promisify } = require('util');
+const exec = promisify(require('child_process').exec);
+
+async function main() {
+  try {
+    // Fetch JSON data containing the latest chart version number with name
+    const { data } = await axios.get('https://my-api.com/latest-chart-version');
+    const chartName = data.name;
+    const chartVersion = data.version;
+
+    // Checkout Bitbucket code matching the chart name
+    const { stdout: repoPath } = await exec(`git clone git@bitbucket.org:my-org/${chartName}.git`);
+    await exec(`cd ${repoPath} && git checkout ${chartVersion}`);
+
+    // Upload data to Harness.io using the Drift API
+    const serviceYaml = fs.readFileSync(`${repoPath}/helm/chart/oracle/templates/service.yaml`, 'utf8');
+    const workflowYaml = fs.readFileSync(`${repoPath}/helm/chart/oracle/templates/workflow.yaml`, 'utf8');
+    const pipelineYaml = fs.readFileSync(`${repoPath}/helm/chart/oracle/templates/pipeline.yaml`, 'utf8');
+    const driftApiUrl = 'https://driftapi.harness.io/v1alpha1';
+    const harnessAccountId = 'my-account-id';
+    const harnessApiKey = 'my-api-key';
+    const headers = {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${harnessApiKey}`,
+    };
+    const serviceResponse = await axios.post(`${driftApiUrl}/accounts/${harnessAccountId}/services`, {
+      name: chartName,
+      configAsYaml: serviceYaml,
+    }, { headers });
+    console.log('Service uploaded:', serviceResponse.data);
+
+    const workflowResponse = await axios.post(`${driftApiUrl}/accounts/${harnessAccountId}/workflows`, {
+      name: chartName,
+      configAsYaml: workflowYaml,
+    }, { headers });
+    console.log('Workflow uploaded:', workflowResponse.data);
+
+    const pipelineResponse = await axios.post(`${driftApiUrl}/accounts/${harnessAccountId}/pipelines`, {
+      name: chartName,
+      configAsYaml: pipelineYaml,
+    }, { headers });
+    console.log('Pipeline uploaded:', pipelineResponse.data);
+
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+main();
