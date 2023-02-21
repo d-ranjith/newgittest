@@ -1,7 +1,91 @@
-db.helm_charts.aggregate([
-   { $sort: { chart_name: 1, database_type: 1, created_at: -1 } },
-   { $group: { _id: { chart_name: "$chart_name", database_type: "$database_type" }, latest_version: { $first: "$chart_version" } } }
-])
+name: my-service
+description: My GraphQL service
+type: GRAPHQL
+
+graphqlServiceConfig:
+  url: https://my-graphql-endpoint.com
+  authenticationType: APIKEY
+  apiKey: ${env.HARNESS_GRAPHQL_API_KEY}
+
+deploymentType: KUBERNETES
+kubernetes:
+  manifestType: HELM
+  chartName: my-chart
+  chartVersion: 1.0.0
+  overrideValuesYaml: |
+    image:
+      repository: my-graphql-image
+      tag: latest
+    service:
+      port: 8080
+    replicaCount: 3
+
+
+mutation {
+  createWorkflow(
+    workflow: {
+      name: "My Workflow"
+      applicationId: "abc123"
+      workflowType: CLOUD_PROVIDER
+      file: "{ contents of your workflow file }"
+    }
+    environmentId: "def456"
+    serviceOverrideVariables: {
+      overrideValues: true
+      valuesOverride: "{ contents of your service overrides file }"
+    }
+    workflowOverrideVariables: {
+      overrideValues: true
+      valuesOverride: "{ contents of your workflow overrides file }"
+    }
+  ) {
+    workflow {
+      id
+      name
+      workflowType
+    }
+  }
+}
+
+
+mutation createPipeline {
+  createPipeline(
+    input: {
+      name: "My Pipeline"
+      applicationId: "my-application-id"
+      pipelineType: CD
+      workflowIds: ["my-workflow-id"]
+      pipelineStages: [
+        {
+          stageName: "Deploy to Test",
+          stageType: DEPLOY,
+          serviceActionId: "my-service-action-id",
+          targetSpec: {
+            cloudProviderName: "kubernetes",
+            namespace: "test"
+          }
+        },
+        {
+          stageName: "Deploy to Prod",
+          stageType: DEPLOY,
+          serviceActionId: "my-service-action-id",
+          targetSpec: {
+            cloudProviderName: "kubernetes",
+            namespace: "prod"
+          }
+        }
+      ]
+    }
+  ) {
+    pipeline {
+      id
+      name
+    }
+  }
+}
+
+
+
 
 #!/bin/bash
 
