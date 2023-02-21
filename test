@@ -325,3 +325,44 @@ async function main() {
 }
 
 main();
+
+
+-----
+# General configuration
+namespace: oracle
+image: my-registry/oracle:latest
+replicas: 2
+
+# Database configuration
+db:
+  type: oracle
+  name: mydb
+  host: db.example.com
+  port: 1521
+  user: myuser
+  password: mypassword
+
+# Service configuration
+service:
+  type: LoadBalancer
+  port: 8080
+  healthCheckPath: /health
+
+# Environment specific configuration
+environments:
+  - name: dev
+    db:
+      name: mydb-dev
+      user: myuser-dev
+      password: mypassword-dev
+  - name: qa
+    db:
+      name: mydb-qa
+      user: myuser-qa
+      password: mypassword-qa
+  - name: prod
+    db:
+      name: mydb-prod
+      user: myuser-prod
+      password: mypassword-prod
+      replicas: 3
