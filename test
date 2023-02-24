@@ -455,3 +455,34 @@ environments:
       user: myuser-prod
       password: mypassword-prod
       replicas: 3
+      
+      
+----
+
+# Snowflake service values
+snowflake:
+  image:
+    repository: myorg/snowflake
+    tag: v1.0.0
+  port: 8080
+  replicas: 2
+  # Additional service-specific values go here
+
+# Workflow values
+workflow:
+  name: my-workflow
+  workflowType: CONTINUOUS_DELIVERY
+  # Additional workflow-specific values go here
+
+# Pipeline values
+pipeline:
+  name: my-pipeline
+  trigger: MANUAL
+  # Additional pipeline-specific values go here
+
+# Common values for all components
+global:
+  environment: dev
+  # Additional global values go here
+
+
