@@ -485,4 +485,65 @@ global:
   environment: dev
   # Additional global values go here
 
+====
+
+# Default values for Harness charts.
+# This is a YAML-formatted file.
+
+global:
+  namespace: "default"
+  app_name: "my-app"
+  app_env: "dev"
+
+environments:
+  - name: "dev"
+    type: "KUBERNETES"
+    namespace: "dev-namespace"
+    label_selector: "env=dev"
+    # Optional: Define the Kubernetes service account to use for the deployment.
+    # service_account_name: ""
+
+  - name: "test"
+    type: "KUBERNETES"
+    namespace: "test-namespace"
+    label_selector: "env=test"
+    # Optional: Define the Kubernetes service account to use for the deployment.
+    # service_account_name: ""
+
+  - name: "prod"
+    type: "KUBERNETES"
+    namespace: "prod-namespace"
+    label_selector: "env=prod"
+    # Optional: Define the Kubernetes service account to use for the deployment.
+    # service_account_name: ""
+
+services:
+  - name: "my-service"
+    chart: "snowflake"
+    chart_version: "1.0.0"
+    # Optional: Define any overrides to the chart values.
+    values_file: "service-overrides.yaml"
+
+workflows:
+  - name: "my-workflow"
+    service_name: "my-service"
+    chart: "oracle"
+    chart_version: "1.0.0"
+    # Optional: Define any overrides to the chart values.
+    values_file: "workflow-overrides.yaml"
+
+pipelines:
+  - name: "my-pipeline"
+    workflow_name: "my-workflow"
+    environments:
+      - name: "dev"
+      - name: "test"
+      - name: "prod"
+    # Optional: Define an approval step before promoting to the next environment.
+    approval_step:
+      type: "MANUAL"
+      name: "my-approval-step"
+      description: "Please approve the deployment to the next environment."
+      approver_email: "user@example.com"
+
 
