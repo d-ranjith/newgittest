@@ -39,6 +39,16 @@ const {
   APIGEE_MAX_POLL_ATTEMPTS = env.HELM_APIGEE_MAX_POLL_ATTEMPTS || 10 // default to 10 polling attempts
 } = env;
 
+// Validate required environment variables are set
+if (!APIGEE_BASE_URL || !APIGEE_ORG || !APIGEE_PROXY_NAME || !APIGEE_ENV || !APIGEE_TOKEN || !APIGEE_CERT_PATH || !APIGEE_CERT_PASSWORD || !APIGEE_BUNDLE_PATH) {
+  logger.error('Missing required environment variable(s). Check .env file or Helm chart configuration.');
+  process.exit(1);
+}
+
+// Continue with API request
+// ...rest of the code
+
+
 // Create a new FormData object and append the ZIP file to it
 const formData = new FormData();
 formData.append('file', fs.createReadStream(APIGEE_BUNDLE_PATH), {
