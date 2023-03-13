@@ -1,3 +1,14 @@
+APIGEE_ORG=myorg
+APIGEE_ENV=test
+APIGEE_API_VERSION=v1
+APIGEE_BASE_URL=https://api.enterprise.apigee.com
+APIGEE_PROXY_NAME=myproxy
+APIGEE_BUNDLE_PATH=./myproxy.zip
+APIGEE_CERT_PATH=./cert.pem
+APIGEE_CERT_PASSWORD=mypassword
+APIGEE_TOKEN=mytoken
+
+
 - apigee-bundle-uploader/
   - index.js
   - package.json
