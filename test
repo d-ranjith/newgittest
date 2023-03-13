@@ -1,3 +1,123 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: apigee-proxy-upload-job
+spec:
+  template:
+    spec:
+      containers:
+        - name: apigee-proxy-upload-container
+          image: your-docker-image:tag
+          env:
+            - name: CERT_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: apigee-mtls-secret
+                  key: cert.pem
+            - name: KEY_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: apigee-mtls-secret
+                  key: key.pem
+            - name: TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: apigee-token-secret
+                  key: token
+            - name: PROXY_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-proxy-configmap
+                  key: proxy_name
+            - name: ORG
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-org-configmap
+                  key: org_name
+            - name: ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-env-configmap
+                  key: env_name
+          command: ["node", "app.js
+          
+
+kubectl create secret generic apigee-mtls-secret --from-file=cert.pem=/path/to/mtls/cert.pem --from-file=key.pem=/path/to/mtls/key.pem
+
+kubectl create secret generic apigee-token-secret --from-literal=token=your-auth-token
+kubectl create configmap apigee-proxy-configmap --from-literal=proxy_name=your-proxy-name
+kubectl create configmap apigee-org-configmap --from-literal=org_name=your-org
+kubectl create configmap apigee-env-configmap --from-literal=env_name=your-env
+
+
+const axios = require('axios');
+const fs = require('fs');
+
+const env = require('dotenv').config();
+
+const apiEndpointUrl = process.env.APIGEE_ENDPOINT_URL;
+const certPath = process.env.CERT_PATH;
+const certPassword = process.env.CERT_PASSWORD;
+const token = process.env.TOKEN;
+const uploadPath = process.env.UPLOAD_PATH; // the path to the bundle file
+
+const options = {
+  method: 'post',
+  url: `${apiEndpointUrl}/v1/o/${org}/apis/${apiName}/revisions/${revision}/upload`,
+  headers: {
+    'Content-Type': 'application/octet-stream',
+    'Authorization': `Bearer ${token}`
+  },
+  httpsAgent: new https.Agent({
+    pfx: fs.readFileSync(certPath),
+    passphrase: certPassword
+  }),
+  data: fs.createReadStream(uploadPath)
+};
+
+axios(options)
+  .then(response => {
+    console.log('Upload successful!');
+    console.log(response.data);
+  })
+  .catch(error => {
+    if (error.response) {
+      console.log('Error:', error.response.status, error.response.statusText);
+      console.log(error.response.data);
+    } else if (error.request) {
+      console.log('No response received:', error.request);
+    } else {
+      console.log('Error:', error.message);
+    }
+  });
+
+
+
+{
+  "name": "apigee-bundle-uploader",
+  "version": "1.0.0",
+  "description": "Node.js app for uploading Apigee proxy bundles with certificates and tokens",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.24.0",
+    "dotenv": "^10.0.0",
+    "fs": "0.0.1-security"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}
+
+
+
+
+----
 name: my-service
 description: My GraphQL service
 type: GRAPHQL
