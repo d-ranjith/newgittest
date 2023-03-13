@@ -1,3 +1,83 @@
+const fs = require('fs');
+const axios = require('axios');
+const dotenv = require('dotenv');
+const pino = require('pino')({
+  level: 'info',
+  prettyPrint: { colorize: true },
+});
+
+// Load environment variables from .env file or Helm chart
+dotenv.config();
+
+// Set up authentication headers
+const auth = {
+  username: process.env.APIGEE_USERNAME,
+  password: process.env.APIGEE_PASSWORD,
+  client_id: process.env.APIGEE_CLIENT_ID,
+  client_secret: process.env.APIGEE_CLIENT_SECRET,
+  token: process.env.APIGEE_TOKEN,
+  cert: fs.readFileSync(process.env.APIGEE_CERT_PATH),
+  key: fs.readFileSync(process.env.APIGEE_KEY_PATH),
+  passphrase: process.env.APIGEE_PASSPHRASE,
+};
+
+// Create Apigee proxy and get revision ID
+async function createProxy() {
+  try {
+    const response = await axios.post(
+      `https://api.enterprise.apigee.com/v1/organizations/${process.env.APIGEE_ORG}/apis`,
+      {
+        name: process.env.APIGEE_PROXY_NAME,
+        connectionType: 'none',
+      },
+      { auth }
+    );
+    const revisionId = response.data.revision[0].name;
+    pino.info(`Apigee proxy created with revision ID ${revisionId}`);
+    return revisionId;
+  } catch (error) {
+    pino.error(`Error creating Apigee proxy: ${error.message}`);
+    throw error;
+  }
+}
+
+// Upload Apigee bundle
+async function uploadBundle(revisionId) {
+  try {
+    const bundle = fs.createReadStream(process.env.APIGEE_BUNDLE_PATH);
+    const response = await axios.put(
+      `https://api.enterprise.apigee.com/v1/organizations/${process.env.APIGEE_ORG}/apis/${process.env.APIGEE_PROXY_NAME}/revisions/${revisionId}/deployments`,
+      bundle,
+      {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+        },
+        auth,
+      }
+    );
+    pino.info(`Apigee bundle uploaded with status code ${response.status}`);
+  } catch (error) {
+    pino.error(`Error uploading Apigee bundle: ${error.message}`);
+    throw error;
+  }
+}
+
+// Main function
+async function main() {
+  try {
+    const revisionId = await createProxy();
+    await uploadBundle(revisionId);
+  } catch (error) {
+    pino.error(`An error occurred: ${error.message}`);
+    process.exit(1);
+  }
+}
+
+main();
+
+
+======================
+
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
