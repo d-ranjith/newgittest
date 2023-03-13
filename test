@@ -1,29 +1,103 @@
-{
-  "name": "my-apigee-app",
-  "version": "1.0.0",
-  "dependencies": {
-    "axios": "^0.24.0",
-    "dotenv": "^10.0.0",
-    "pino": "^6.12.0"
-  },
-  "devDependencies": {
-    "eslint": "^8.3.0",
-    "eslint-config-standard": "^17.0.0",
-    "eslint-plugin-import": "^2.25.2",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^5.1.0",
-    "eslint-plugin-standard": "^5.0.0",
-    "nodemon": "^2.0.15"
-  }
+const axios = require('axios');
+const FormData = require('form-data');
+const fs = require('fs');
+const { createLogger, format, transports } = require('winston');
+const { combine, timestamp, printf } = format;
+
+const env = process.env;
+
+// Configure logger
+const myFormat = printf(({ level, message, timestamp }) => {
+  return `${timestamp} [${level}]: ${message}`;
+});
+const logger = createLogger({
+  level: 'info',
+  format: combine(
+    timestamp(),
+    myFormat
+  ),
+  transports: [
+    new transports.Console()
+  ]
+});
+
+// Read configuration from environment variables or Helm chart values
+const certPath = env.CERT_PATH || '/etc/ssl/certs/server.crt';
+const keyPath = env.KEY_PATH || '/etc/ssl/private/server.key';
+const certPwd = env.CERT_PASSWORD || 'mypassword';
+const token = env.APIGEE_TOKEN || 'mytoken';
+const org = env.APIGEE_ORG || 'myorg';
+const envName = env.APIGEE_ENV || 'myenv';
+const apiName = env.APIGEE_API || 'myapi';
+const bundlePath = env.BUNDLE_PATH || './bundle.zip';
+const uploadPath = env.APIGEE_UPLOAD_PATH || `/organizations/${org}/apis/${apiName}/revisions`;
+
+// Validate configuration
+if (!fs.existsSync(certPath)) {
+  logger.error(`Certificate file not found at ${certPath}`);
+  process.exit(1);
+}
+if (!fs.existsSync(keyPath)) {
+  logger.error(`Key file not found at ${keyPath}`);
+  process.exit(1);
+}
+if (!fs.existsSync(bundlePath)) {
+  logger.error(`Bundle file not found at ${bundlePath}`);
+  process.exit(1);
 }
 
+// Read certificate and key files
+const cert = fs.readFileSync(certPath);
+const key = fs.readFileSync(keyPath);
 
+// Create form data object with bundle file
+const formData = new FormData();
+formData.append('file', fs.createReadStream(bundlePath));
+
+// Configure Axios
+const api = axios.create({
+  baseURL: `https://api.enterprise.apigee.com/v1${uploadPath}`,
+  headers: {
+    'Content-Type': 'multipart/form-data',
+    'Authorization': `Bearer ${token}`
+  },
+  httpsAgent: new https.Agent({
+    cert: cert,
+    key: key,
+    passphrase: certPwd
+  })
+});
+
+// Create proxy revision
+api.post(`/organizations/${org}/apis/${apiName}/revisions`, {})
+  .then(response => {
+    const revision = response.data.revision;
+    logger.info(`Created revision ${revision} for API ${apiName}`);
+    // Upload bundle to revision
+    return api.put(`/organizations/${org}/apis/${apiName}/revisions/${revision}/deployments?action=import&name=${envName}`, formData, {
+      headers: {
+        'Content-Type': `multipart/form-data; boundary=${formData._boundary}`
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    });
+  })
+  .then(response => {
+    logger.info(`Uploaded bundle to API ${apiName} revision ${response.data.revision}`);
+  })
+  .catch(error => {
+    logger.error(`Error uploading bundle to API ${apiName}: ${error}`);
+  });
+
+====================
 const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
 const { createLogger, format, transports } = require('winston');
 const { combine, timestamp, printf } = format;
+const https = require('https');
+const { promisify } = require('util');
 
 // Create a log formatter that outputs logs in ISO format
 const isoLogFormatter = printf(({ level, message, timestamp }) => {
@@ -65,28 +139,24 @@ if (!APIGEE_BASE_URL || !APIGEE_ORG || !APIGEE_PROXY_NAME || !APIGEE_ENV || !API
   process.exit(1);
 }
 
-// Continue with API request
-// ...rest of the code
-
-
 // Create a new FormData object and append the ZIP file to it
 const formData = new FormData();
 formData.append('file', fs.createReadStream(APIGEE_BUNDLE_PATH), {
-filename: path.basename(APIGEE_BUNDLE_PATH)
+  filename: path.basename(APIGEE_BUNDLE_PATH)
 });
-
-// Create a new Axios instance with the APIGEE base URL and version
-const apigeeAxios = axios.create({
-baseURL: ${APIGEE_BASE_URL}/${APIGEE_API_VERSION}
-});
-
-// Set the APIGEE authorization header to the token
-apigeeAxios.defaults.headers.common['Authorization'] = Bearer ${APIGEE_TOKEN};
 
 // Define a function to upload the bundle to Apigee
 async function uploadBundle() {
-try {
-// Make a POST request to the Apigee API endpoint to upload the bundle
+  // Create a new Axios instance with the APIGEE base URL and version, using a proxy
+  const proxyAxios = axios.create({
+    baseURL: `${APIGEE_BASE_URL}/${APIGEE_API_VERSION}`,
+    httpsAgent: await createHttpsAgent(APIGEE_CERT_PATH, APIGEE_CERT_PASSWORD, APIGEE_PROXY_URL)
+  });
+  proxyAxios.defaults.headers.common['Authorization'] = `Bearer ${APIGEE_TOKEN}`;
+  
+  try {
+    // Make a POST request to the Apigee API endpoint to upload the bundle, using the FormData object
+
 const response = await apigeeAxios.post(/organizations/${APIGEE_ORG}/environments/${APIGEE_ENV}/apis/${APIGEE_PROXY_NAME}/revisions, formData, {
 headers: {
 ...formData.getHeaders()
@@ -110,218 +180,93 @@ throw error;
 }
 }
 
-// Define a function to poll the Apigee API to check the status of the deployment
-async function pollDeploymentStatus(revisionId) {
-let attempts = 0;
+// Define a function to upload the proxy to Apigee with retry logic
+async function uploadProxyWithRetry() {
+const maxRetries = 3;
+let attempt = 1;
 
-while (attempts < APIGEE_MAX_POLL_ATTEMPTS) {
+while (attempt <= maxRetries) {
 try {
-// Make a GET request to the Apigee API endpoint to get the status of the deployment
-const response = await apigeeAxios.get(/organizations/${APIGEE_ORG}/environments/${APIGEE_ENV}/apis/${APIGEE_PROXY_NAME}/revisions/${revisionId}/deployments);
-
-  // Get the current deployment status
-  const status = response.data.environment[0].revision[0].state;
-
-  // Log an informative message with the current deployment status
-  logger.info(`Deployment status: ${status}`);
-
-  // If the status is "deployed", return the revision ID
-  if (status === 'deployed') {
-    return revisionId;
-  }
+logger.info(Uploading bundle attempt ${attempt}...);
+const revisionId = await uploadBundle();
+return revisionId;
 } catch (error) {
-  // Log an error message and continue polling
-  logger.error(`Error checking deployment status: ${error.message}`);
+logger.error(Failed to upload bundle on attempt ${attempt}: ${error.message});
+if (attempt === maxRetries) {
+throw error;
+}
+logger.info(Retrying upload in 10 seconds...);
+await new Promise(resolve => setTimeout(resolve, 10000));
+attempt++;
+}
+}
 }
 
-// Increment the number of attempts and wait for the polling interval before trying again
-attempts++;
-await new Promise(resolve => setTimeout(resolve, APIGEE_POLL_INTERVAL));
-
-}
-
-// If the maximum number of polling attempts has been reached, log an error message and return null
-logger.error(Maximum number of polling attempts reached (${APIGEE_MAX_POLL_ATTEMPTS}). Giving up.);
-return null;
-}
-
-// Upload the bundle and poll the deployment status
-uploadBundle()
-.then(revisionId => pollDeploymentStatus(revisionId))
-.then(revisionId => {
-// If the revision ID is not null, log a success message with the revision ID
-if (revisionId) {
-logger.info(Deployment successful. Revision ID: ${revisionId});
-} else {
-// Otherwise, log a failure message
-logger.error('Deployment failed.');
-}
+// Define a function to upload the proxy bundle to Apigee using a proxy endpoint
+async function uploadProxyBundle() {
+try {
+// Make a POST request to the Apigee proxy endpoint to upload the bundle
+const response = await apigeeAxios.post(/uploadProxy/${APIGEE_ORG}/${APIGEE_ENV}/${APIGEE_PROXY_NAME}, formData, {
+headers: {
+...formData.getHeaders(),
+Authorization: Bearer ${APIGEE_TOKEN}
+},
+httpsAgent: new https.Agent({
+cert: fs.readFileSync(APIGEE_CERT_PATH),
+passphrase: APIGEE_CERT_PASSWORD
 })
-.catch(error => {
-// Log any unhandled errors
-logger.error(Unhandled error: ${error.message});
 });
 
+// Log a success message with the revision ID
+logger.info(`Bundle uploaded successfully using proxy. Revision ID: ${response.data.revision}`);
+
+// Return the revision ID
+return response.data.revision;
+} catch (error) {
+// Log an error message and re-throw the error
+logger.error(Error uploading bundle using proxy: ${error.message});
+throw error;
+}
+}
+
+// Define a function to upload the proxy bundle to Apigee with retry logic
+async function uploadProxyBundleWithRetry() {
+const maxRetries = 3;
+let attempt = 1;
+
+while (attempt <= maxRetries) {
+try {
+logger.info(Uploading bundle using proxy attempt ${attempt}...);
+const revisionId = await uploadProxyBundle();
+return revisionId;
+} catch (error) {
+logger.error(Failed to upload bundle using proxy on attempt ${attempt}: ${error.message});
+if (attempt === maxRetries) {
+throw error;
+}
+logger.info(Retrying upload in 10 seconds...);
+await new Promise(resolve => setTimeout(resolve, 10000));
+attempt++;
+}
+}
+}
 
 
+async function createProxyRevision(currentRevision, newProperties) {
+  try {
+    // Create a new revision based on the current revision
+    const newRevision = Object.assign({}, currentRevision);
 
+    // Add the new properties to the new revision
+    Object.keys(newProperties).forEach((key) => {
+      newRevision[key] = newProperties[key];
+    });
 
-
-APIGEE_ORG=myorg
-APIGEE_ENV=test
-APIGEE_API_VERSION=v1
-APIGEE_BASE_URL=https://api.enterprise.apigee.com
-APIGEE_PROXY_NAME=myproxy
-APIGEE_BUNDLE_PATH=./myproxy.zip
-APIGEE_CERT_PATH=./cert.pem
-APIGEE_CERT_PASSWORD=mypassword
-APIGEE_TOKEN=mytoken
-
-
-- apigee-bundle-uploader/
-  - index.js
-  - package.json
-  - package-lock.json
-  - .env
-  - Dockerfile
-
-
-# Use the official Node.js 16 image as the base image
-FROM node:16
-
-# Set the working directory to /app
-WORKDIR /app
-
-# Copy the package.json and package-lock.json files to the container
-COPY package*.json ./
-
-# Install the dependencies
-RUN npm install
-
-# Copy the application code to the container
-COPY . .
-
-# Expose port 3000 for the application to listen on
-EXPOSE 3000
-
-# Run the application using the "npm start" command
-CMD ["npm", "start"]
-
-
-
-apiVersion: batch/v1
-kind: Job
-metadata:
-  name: apigee-proxy-upload-job
-spec:
-  template:
-    spec:
-      containers:
-        - name: apigee-proxy-upload-container
-          image: your-docker-image:tag
-          env:
-            - name: CERT_PATH
-              valueFrom:
-                secretKeyRef:
-                  name: apigee-mtls-secret
-                  key: cert.pem
-            - name: KEY_PATH
-              valueFrom:
-                secretKeyRef:
-                  name: apigee-mtls-secret
-                  key: key.pem
-            - name: TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: apigee-token-secret
-                  key: token
-            - name: PROXY_NAME
-              valueFrom:
-                configMapKeyRef:
-                  name: apigee-proxy-configmap
-                  key: proxy_name
-            - name: ORG
-              valueFrom:
-                configMapKeyRef:
-                  name: apigee-org-configmap
-                  key: org_name
-            - name: ENV
-              valueFrom:
-                configMapKeyRef:
-                  name: apigee-env-configmap
-                  key: env_name
-          command: ["node", "app.js
-          
-
-kubectl create secret generic apigee-mtls-secret --from-file=cert.pem=/path/to/mtls/cert.pem --from-file=key.pem=/path/to/mtls/key.pem
-
-kubectl create secret generic apigee-token-secret --from-literal=token=your-auth-token
-kubectl create configmap apigee-proxy-configmap --from-literal=proxy_name=your-proxy-name
-kubectl create configmap apigee-org-configmap --from-literal=org_name=your-org
-kubectl create configmap apigee-env-configmap --from-literal=env_name=your-env
-
-
-const axios = require('axios');
-const fs = require('fs');
-
-const env = require('dotenv').config();
-
-const apiEndpointUrl = process.env.APIGEE_ENDPOINT_URL;
-const certPath = process.env.CERT_PATH;
-const certPassword = process.env.CERT_PASSWORD;
-const token = process.env.TOKEN;
-const uploadPath = process.env.UPLOAD_PATH; // the path to the bundle file
-
-const options = {
-  method: 'post',
-  url: `${apiEndpointUrl}/v1/o/${org}/apis/${apiName}/revisions/${revision}/upload`,
-  headers: {
-    'Content-Type': 'application/octet-stream',
-    'Authorization': `Bearer ${token}`
-  },
-  httpsAgent: new https.Agent({
-    pfx: fs.readFileSync(certPath),
-    passphrase: certPassword
-  }),
-  data: fs.createReadStream(uploadPath)
-};
-
-axios(options)
-  .then(response => {
-    console.log('Upload successful!');
-    console.log(response.data);
-  })
-  .catch(error => {
-    if (error.response) {
-      console.log('Error:', error.response.status, error.response.statusText);
-      console.log(error.response.data);
-    } else if (error.request) {
-      console.log('No response received:', error.request);
-    } else {
-      console.log('Error:', error.message);
-    }
-  });
-
-
-
-{
-  "name": "apigee-bundle-uploader",
-  "version": "1.0.0",
-  "description": "Node.js app for uploading Apigee proxy bundles with certificates and tokens",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
-  "author": "Your Name",
-  "license": "MIT",
-  "dependencies": {
-    "axios": "^0.24.0",
-    "dotenv": "^10.0.0",
-    "fs": "0.0.1-security"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.15"
+    // Return the new revision
+    return newRevision;
+  } catch (error) {
+    console.error('An error occurred while creating a new revision:', error);
+    return null;
   }
 }
 
