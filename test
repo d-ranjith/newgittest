@@ -1,5 +1,228 @@
 const fs = require('fs');
 const axios = require('axios');
+const { createProxyPayload } = require('./createProxyPayload');
+const { log } = require('./appLogger');
+
+const APIGEE_URL = process.env.APIGEE_URL;
+const ORG_NAME = process.env.ORG_NAME;
+const ENV_NAME = process.env.ENV_NAME;
+const PROXY_NAME = process.env.PROXY_NAME;
+const APIGEE_USERNAME = process.env.APIGEE_USERNAME;
+const APIGEE_PASSWORD = process.env.APIGEE_PASSWORD;
+const KEY_FILE = process.env.KEY_FILE;
+const CERT_FILE = process.env.CERT_FILE;
+const TOKEN = process.env.TOKEN;
+const BUNDLE_FILE = process.env.BUNDLE_FILE;
+
+// Create the Apigee proxy
+async function createProxy() {
+  const proxyPayload = createProxyPayload(PROXY_NAME);
+  const authHeader = `Basic ${Buffer.from(`${APIGEE_USERNAME}:${APIGEE_PASSWORD}`).toString('base64')}`;
+
+  try {
+    const response = await axios.post(`${APIGEE_URL}/v1/organizations/${ORG_NAME}/environments/${ENV_NAME}/apis`, proxyPayload, {
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (response.status === 201) {
+      const revision = response.data.revision;
+      log.info(`Created Apigee proxy with revision ${revision}`);
+      return revision;
+    } else {
+      const error = `Failed to create Apigee proxy: HTTP ${response.status}`;
+      log.error(error);
+      throw new Error(error);
+    }
+  } catch (error) {
+    log.error(`Failed to create Apigee proxy: ${error}`);
+    throw error;
+  }
+}
+
+// Upload the Apigee proxy bundle
+async function uploadBundle(revision) {
+  const authHeader = `Bearer ${TOKEN}`;
+  const formData = {
+    'file': fs.createReadStream(BUNDLE_FILE),
+  };
+
+  try {
+    const response = await axios.put(`${APIGEE_URL}/v1/organizations/${ORG_NAME}/apis/${PROXY_NAME}/revisions/${revision}/deployments?override=true`, formData, {
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'multipart/form-data',
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+    if (response.status === 200) {
+      log.info(`Uploaded Apigee proxy bundle with revision ${revision}`);
+    } else {
+      const error = `Failed to upload Apigee proxy bundle: HTTP ${response.status}`;
+      log.error(error);
+      throw new Error(error);
+    }
+  } catch (error) {
+    log.error(`Failed to upload Apigee proxy bundle: ${error}`);
+    throw error;
+  }
+}
+
+// Main function to create the proxy and upload the bundle
+async function main() {
+  try {
+    const revision = await createProxy();
+    await uploadBundle(revision);
+  } catch (error) {
+    log.error(`Failed to deploy Apigee proxy: ${error}`);
+    process.exit(1);
+  }
+}
+
+// Run the main function
+main();
+
+============
+const fs = require('fs');
+const axios = require('axios');
+const { createProxyPayload } = require('./createProxyPayload');
+const { log } = require('./appLogger');
+
+const APIGEE_URL = process.env.APIGEE_URL;
+const ORG_NAME = process.env.ORG_NAME;
+const ENV_NAME = process.env.ENV_NAME;
+const PROXY_NAME = process.env.PROXY_NAME;
+const APIGEE_USERNAME = process.env.APIGEE_USERNAME;
+const APIGEE_PASSWORD = process.env.APIGEE_PASSWORD;
+const KEY_FILE = process.env.KEY_FILE;
+const CERT_FILE = process.env.CERT_FILE;
+const TOKEN = process.env.TOKEN;
+const BUNDLE_FILE = process.env.BUNDLE_FILE;
+
+// Create the Apigee proxy
+async function createProxy() {
+  const proxyPayload = createProxyPayload(PROXY_NAME);
+  const authHeader = `Basic ${Buffer.from(`${APIGEE_USERNAME}:${APIGEE_PASSWORD}`).toString('base64')}`;
+
+  try {
+    const response = await axios.post(`${APIGEE_URL}/v1/organizations/${ORG_NAME}/environments/${ENV_NAME}/apis`, proxyPayload, {
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'application/json',
+      },
+    });
+    return response.data.revision;
+  } catch (error) {
+    log.error(`Failed to create Apigee proxy: ${error}`);
+    throw error;
+  }
+}
+
+// Upload the Apigee proxy bundle
+async function uploadBundle(revision) {
+  const authHeader = `Bearer ${TOKEN}`;
+  const formData = {
+    'file': fs.createReadStream(BUNDLE_FILE),
+  };
+
+  try {
+    const response = await axios.put(`${APIGEE_URL}/v1/organizations/${ORG_NAME}/apis/${PROXY_NAME}/revisions/${revision}/deployments?override=true`, formData, {
+      headers: {
+        Authorization: authHeader,
+        'Content-Type': 'multipart/form-data',
+      },
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+    log.info(`Uploaded Apigee proxy bundle with revision ${revision}: ${response.data}`);
+  } catch (error) {
+    log.error(`Failed to upload Apigee proxy bundle: ${error}`);
+    throw error;
+  }
+}
+
+// Main function to create the proxy and upload the bundle
+async function main() {
+  try {
+    const revision = await createProxy();
+    log.info(`Created Apigee proxy with revision ${revision}`);
+    await uploadBundle(revision);
+  } catch (error) {
+    log.error(`Failed to deploy Apigee proxy: ${error}`);
+    process.exit(1);
+  }
+}
+
+// Run the main function
+main();
+
+
+-------------------------------------
+
+const axios = require('axios');
+const fs = require('fs');
+const FormData = require('form-data');
+const pino = require('pino')({ level: process.env.LOG_LEVEL });
+
+// Helper function to make authenticated requests to Apigee
+async function makeRequest(url, method, data, headers) {
+  const auth = {
+    username: process.env.APIGEE_USERNAME,
+    password: process.env.APIGEE_PASSWORD
+  };
+
+  const response = await axios({
+    url,
+    method,
+    data,
+    headers,
+    auth
+  });
+
+  return response.data;
+}
+
+async function main() {
+  // Read the proxy bundle file
+  const bundle = fs.readFileSync(process.env.BUNDLE_PATH);
+
+  // Create the proxy and get the revision ID
+  const createProxyUrl = `https://api.enterprise.apigee.com/v1/organizations/${process.env.APIGEE_ORG}/apis`;
+  const createProxyData = {
+    name: process.env.PROXY_NAME,
+    proxyBundle: bundle.toString('base64')
+  };
+  const createProxyHeaders = {
+    'Content-Type': 'application/json'
+  };
+
+  pino.info('Creating Apigee proxy...');
+  const { revision } = await makeRequest(createProxyUrl, 'POST', createProxyData, createProxyHeaders);
+
+  // Upload the bundle using the revision ID
+  const uploadUrl = `https://api.enterprise.apigee.com/v1/organizations/${process.env.APIGEE_ORG}/apis/${process.env.PROXY_NAME}/revisions/${revision}/proxies/${process.env.PROXY_NAME}/bundle`;
+  const uploadHeaders = {
+    'Content-Type': 'multipart/form-data'
+  };
+  const uploadFormData = new FormData();
+  uploadFormData.append('file', bundle);
+
+  pino.info('Uploading proxy bundle...');
+  await makeRequest(uploadUrl, 'POST', uploadFormData, uploadHeaders);
+
+  pino.info(`Proxy bundle uploaded to revision ${revision}.`);
+}
+
+main().catch((err) => {
+  pino.error(err);
+  process.exit(1);
+});
+
+================================
+const fs = require('fs');
+const axios = require('axios');
 const dotenv = require('dotenv');
 const pino = require('pino')({
   level: 'info',
