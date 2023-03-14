@@ -1,3 +1,53 @@
+const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
+const AdmZip = require('adm-zip');
+const retry = require('async-retry');
+
+const ARTIFACTORY_URL = process.env.ARTIFACTORY_URL;
+const ARTIFACTORY_USERNAME = process.env.ARTIFACTORY_USERNAME;
+const ARTIFACTORY_PASSWORD = process.env.ARTIFACTORY_PASSWORD;
+const FILE_PATH = process.env.FILE_PATH; // the path to save the downloaded file
+
+const downloadArtifactoryData = async () => {
+  const response = await retry(async () => {
+    const { status, data } = await axios.get(ARTIFACTORY_URL, {
+      auth: {
+        username: ARTIFACTORY_USERNAME,
+        password: ARTIFACTORY_PASSWORD,
+      },
+      responseType: 'arraybuffer', // Set the response type to arraybuffer to download the file
+    });
+    if (status >= 200 && status < 300) {
+      return data;
+    }
+    throw new Error(`Failed to fetch data from Artifactory with status code: ${status}`);
+  }, {
+    retries: 3, // Number of retry attempts
+    factor: 2, // Factor by which the delay increases on each retry attempt
+    minTimeout: 1000, // Minimum delay between retry attempts (in milliseconds)
+    maxTimeout: 60000, // Maximum delay between retry attempts (in milliseconds)
+    onRetry: (err) => console.log(`Retrying download: ${err}`), // Function to call on each retry attempt
+  });
+  
+  // Create the directory if it doesn't exist
+  if (!fs.existsSync(path.dirname(FILE_PATH))) {
+    fs.mkdirSync(path.dirname(FILE_PATH), { recursive: true });
+  }
+  
+  // Write the downloaded file to disk
+  const zip = new AdmZip(response);
+  zip.extractAllTo(path.dirname(FILE_PATH), true);
+  
+  console.log(`File downloaded and extracted to ${FILE_PATH}`);
+};
+
+downloadArtifactoryData().catch((err) => {
+  console.error(`Error downloading from Artifactory: ${err}`);
+});
+
+
+-------------------
 const fs = require('fs');
 const axios = require('axios');
 const { createProxyPayload } = require('./createProxyPayload');
