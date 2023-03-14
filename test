@@ -1,3 +1,266 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apigee-config
+data:
+  apigee-org: my-apigee-org
+  apigee-env: my-apigee-env
+  apigee-username: my-apigee-username
+  apigee-password: my-apigee-password
+  apigee-proxy-name: my-apigee-proxy-name
+  apigee-proxy-url: https://my-apigee-proxy-url.com
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: apigee-secret
+type: Opaque
+data:
+  apigee-password: my-apigee-password-encrypted
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-app
+  template:
+    metadata:
+      labels:
+        app: node-app
+    spec:
+      containers:
+        - name: node-app
+          image: my-node-app-image
+          env:
+            - name: APIGEE_ORG
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-config
+                  key: apigee-org
+            - name: APIGEE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-config
+                  key: apigee-env
+            - name: APIGEE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-config
+                  key: apigee-username
+            - name: APIGEE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: apigee-secret
+                  key: apigee-password
+            - name: APIGEE_PROXY_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-config
+                  key: apigee-proxy-name
+            - name: APIGEE_PROXY_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-config
+                  key: apigee-proxy-url
+
+
+
+helm install my-apigee-edge-job ./ --values values.yaml
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "apigee-edge.fullname" . }}-config
+  labels:
+    {{- include "apigee-edge.labels" . | nindent 4 }}
+data:
+  org: {{ .Values.apigee.org }}
+  env: {{ .Values.apigee.env }}
+  user: {{ .Values.apigee.user }}
+  pass: {{ .Values.apigee.pass }}
+  baseurl: {{ .Values.apigee.baseurl }}
+  proxy_name: {{ .Values.apigee.proxy_name }}
+  proxy_bundle_path: {{ .Values.apigee.proxy_bundle_path }}
+
+
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "apigee-edge.fullname" . }}-secret
+  labels:
+    {{- include "apigee-edge.labels" . | nindent 4 }}
+type: Opaque
+data:
+  user: {{ .Values.apigee.user | b64enc }}
+  pass: {{ .Values.apigee.pass | b64enc }}
+
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: apigee-configmap
+data:
+  sector: "{{ .Values.apigeeSector }}"
+  env: "{{ .Values.apigeeEnv }}"
+  fid: "{{ .Values.apigeeFid }}"
+  region: "{{ .Values.apigeeRegion }}"
+  apiBaseVersion: "{{ .Values.apigeeApiBaseVersion }}"
+  proxyName: "{{ .Values.apigeeProxyName }}"
+  baseUrl: "{{ .Values.apigeeBaseUrl }}"
+  proxyBundlePath: "{{ .Values.apigeeProxyBundlePath }}"
+  apiPollIntervals: "{{ .Values.apigeeApiPollIntervals }}"
+  maxPollAttemptValue: "{{ .Values.apigeeMaxPollAttemptValue }}"
+
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.artifactorySecretName }}
+type: Opaque
+stringData:
+  username: "your-artifactory-username"
+  password: "your-artifactory-password"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.apigeeSecretName }}
+type: Opaque
+stringData:
+  secret: "your-apigee-secret"
+  apikey: "your-apigee-apikey"
+  certs: "your-apigee-certs"
+  keys: "your-apigee-keys"
+
+
+jobName: "apigee-edge-job"
+timestamp: {{ .Release.Time.Seconds }}
+image:
+  repository: "your-docker-repo/your-image"
+  tag: "latest"
+  pullPolicy: "IfNotPresent"
+artifactorySecretName: "artifactory-secret"
+apigeeSector: "your-apigee-sector"
+apigeeEnv: "your-apigee-environment"
+apigeeFid: "your-apigee-fid"
+apigeeRegion: "your-apigee-region"
+apigeeSecretName: "apigee-secret"
+apigeeApiBaseVersion: "your-apigee-api-base-version"
+apigeeProxyName: "your-apigee-proxy-name"
+apigeeBaseUrl: "your-apigee-base-url"
+apigeeProxyBundlePath: "your-apigee-proxy-bundle-path"
+apigeeCerts: "your-apigee-certs"
+apigeeKeys: "your-apigee-keys"
+apigeeApiPollIntervals: "your-apigee-api-poll-intervals"
+apigeeMaxPollAttemptValue: "your-apigee-max-poll-attempt-value"
+
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Values.jobName }}-{{ .Values.timestamp }}
+spec:
+  template:
+    spec:
+      containers:
+        - name: {{ .Values.jobName }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: ARTIFACTORY_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.artifactorySecretName }}
+                  key: username
+            - name: ARTIFACTORY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.artifactorySecretName }}
+                  key: password
+            - name: APIGEE_SECTOR
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: sector
+            - name: APIGEE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: env
+            - name: APIGEE_FID
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: fid
+            - name: APIGEE_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: region
+            - name: APIGEE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apigeeSecretName }}
+                  key: secret
+            - name: APIGEE_APIKEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apigeeSecretName }}
+                  key: apikey
+            - name: APIGEE_API_BASE_VERSION
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: apiBaseVersion
+            - name: APIGEE_PROXY_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: proxyName
+            - name: APIGEE_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: baseUrl
+            - name: APIGEE_PROXY_BUNDLE_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: proxyBundlePath
+            - name: APIGEE_CERTS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apigeeSecretName }}
+                  key: certs
+            - name: APIGEE_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.apigeeSecretName }}
+                  key: keys
+            - name: APIGEE_API_POLL_INTERVALS
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: apiPollIntervals
+            - name: APIGEE_MAX_POLL_ATTEMPT_VALUE
+              valueFrom:
+                configMapKeyRef:
+                  name: apigee-configmap
+                  key: maxPollAttemptValue
+          command: [ "node" ]
+          args: [ "index.js" ]
+      restartPolicy: Never
+  backoffLimit: 0
+
+
+
+===============================
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
