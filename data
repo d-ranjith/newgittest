@@ -1,0 +1,88 @@
+Java
+----
+
+What is the difference between continuous integration and continuous deployment?
+Continuous integration is the practice of regularly integrating code changes into a shared repository and running automated tests to detect and fix any issues. Continuous deployment is the practice of automatically deploying code changes to production after they have passed all tests and are approved for release.
+
+What is blue-green deployment and can you explain how it works?
+Blue-green deployment is a deployment strategy that involves having two identical environments, one that is currently live (blue) and one that is not yet live (green). When a new version of the application is ready for release, it is deployed to the green environment and tested thoroughly. Once the new version is deemed stable, traffic is switched over from the blue environment to the green environment. If any issues are found, traffic can be easily switched back to the blue environment.
+
+What is containerization and how does it relate to CI/CD?
+Containerization is a technology that allows developers to package an application and its dependencies into a lightweight, portable container that can run consistently across different environments. Containerization can be used as part of a CI/CD pipeline to ensure that the application runs the same way in all environments, from development to production.
+
+How do you ensure that your CI/CD pipeline is secure?
+Ensuring the security of a CI/CD pipeline involves implementing a number of best practices, such as using secure coding practices, scanning code for vulnerabilities, using secure authentication and authorization mechanisms, and regularly updating software components and dependencies to address security issues.
+
+Can you explain the concept of immutable infrastructure and how it relates to CI/CD?
+Immutable infrastructure is an approach to infrastructure management that involves creating and deploying infrastructure as immutable artifacts that cannot be changed after they are deployed. This approach ensures that the infrastructure is consistent across environments and eliminates configuration drift. Immutable infrastructure can be used as part of a CI/CD pipeline to ensure that the infrastructure used for testing and deployment is consistent and reliable.
+
+Docker
+-----
+
+What is Docker and how does it work?
+Docker is a containerization platform that allows developers to package an application and its dependencies into a lightweight, portable container that can run consistently across different environments. Docker works by isolating an application and its dependencies into a container, which can then be run on any machine that has Docker installed.
+
+What is the difference between a Docker container and a Docker image?
+A Docker image is a read-only template that contains the instructions for creating a Docker container. A Docker container is a running instance of a Docker image, which can be started, stopped, and deleted as needed.
+
+How do you orchestrate multiple Docker containers?
+There are several tools available for orchestrating multiple Docker containers, including Docker Compose, Kubernetes, and Docker Swarm. These tools allow developers to automate the deployment, scaling, and management of multiple Docker containers.
+
+How do you ensure that Docker containers are secure?
+Ensuring the security of Docker containers involves implementing a number of best practices, such as using only trusted Docker images, using secure authentication and authorization mechanisms, regularly updating software components and dependencies to address security issues, and monitoring Docker container activity for suspicious behavior.
+
+How do you troubleshoot Docker containers that are not working properly?
+Troubleshooting Docker containers involves using tools like Docker logs, Docker stats, and Docker inspect to identify any issues with the container. Common issues include configuration errors, network connectivity issues, and resource constraints. Once the issue has been identified, developers can update the container configuration or redeploy the container as needed.
+
+Kubernetes
+---------
+What is Kubernetes and how does it work?
+Kubernetes is an open-source container orchestration platform that automates the deployment, scaling, and management of containerized applications. It works by creating and managing a cluster of nodes that run containers, and provides tools for managing the lifecycle of containers, including scaling, rolling updates, and self-healing.
+
+What is the difference between a Kubernetes pod and a Kubernetes deployment?
+A Kubernetes pod is the smallest deployable unit in Kubernetes and represents a single instance of a running process. A Kubernetes deployment, on the other hand, is a higher-level abstraction that manages the deployment and scaling of multiple replicas of a pod.
+
+How do you perform a rolling update of a Kubernetes deployment?
+To perform a rolling update of a Kubernetes deployment, developers can update the container image in the deployment's specification and apply the changes using the kubectl apply command. Kubernetes will automatically update the deployment one replica at a time, ensuring that the application remains available during the update.
+
+How do you scale a Kubernetes deployment?
+To scale a Kubernetes deployment, developers can use the kubectl scale command to increase or decrease the number of replicas in the deployment. Kubernetes will automatically create or delete pods as needed to meet the desired replica count.
+
+What is a Kubernetes service and how does it work?
+A Kubernetes service is an abstraction that defines a logical set of pods and a policy for accessing them. Services allow developers to expose an application running in a set of pods to other applications within the same Kubernetes cluster or to external clients outside the cluster. Services use labels to select the pods that they expose, and can provide load balancing, service discovery, and other networking features.
+
+
+Python
+------
+
+What is a decorator in Python and how does it work?
+A decorator in Python is a function that takes another function as input, modifies its behavior, and returns the modified function. Decorators are used to modify or enhance the behavior of functions without modifying the original function code.
+
+What is a generator in Python and how does it work?
+A generator in Python is a function that returns an iterator, which can be used to generate a sequence of values on demand. Generators are used to generate large sequences of values without having to store them in memory all at once.
+
+What is the difference between a list and a tuple in Python?
+A list in Python is a mutable sequence of values, while a tuple is an immutable sequence of values. Lists are created using square brackets [], while tuples are created using parentheses ().
+
+What is a lambda function in Python and when would you use one?
+A lambda function in Python is an anonymous function that can be defined on a single line. Lambda functions are often used to define small, throwaway functions that are only used once and don't require a formal function definition.
+
+What is the difference between a shallow copy and a deep copy in Python?
+A shallow copy in Python creates a new object that references the same memory location as the original object, while a deep copy creates a new object with its own memory location and copies all the values from the original object. Shallow copies are created using the copy() method or the slicing operator [:], while deep copies are created using the deepcopy() method from the copy module.
+
+Bash
+----
+What is a Bash script and how do you create one?
+A Bash script is a program written in the Bash shell scripting language that can be executed in a Unix or Linux environment. To create a Bash script, you can use a text editor to create a file with a .sh file extension, add the Bash script code to the file, set the file permissions to allow execution, and run the script using the ./filename.sh command.
+
+What is the difference between a Bash alias and a Bash function?
+A Bash alias is a shorthand name for a command or sequence of commands that can be used instead of typing the full command each time. A Bash function is a block of code that can be reused in different parts of a Bash script or terminal session. Aliases are defined using the alias command, while functions are defined using the function keyword or the shorthand syntax.
+
+How do you pass command line arguments to a Bash script?
+Command line arguments can be passed to a Bash script using the $1, $2, $3, etc. variables, which correspond to the first, second, third, etc. arguments passed to the script. The variables can be accessed within the script using the $ symbol followed by the variable number, such as $1 or $2.
+
+How do you use conditionals in a Bash script?
+Conditionals in Bash scripts are used to execute different code based on the result of a test or comparison. The if-else statement is the most commonly used conditional statement in Bash, and it is used to execute one block of code if a condition is true and another block of code if the condition is false.
+
+How do you use loops in a Bash script?
+Loops in Bash scripts are used to execute a block of code multiple times. The for loop is the most commonly used loop in Bash, and it is used to iterate over a range of values or a list of items. The while loop is also commonly used to execute a block of code while a condition is true.
