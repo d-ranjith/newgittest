@@ -86,3 +86,38 @@ Conditionals in Bash scripts are used to execute different code based on the res
 
 How do you use loops in a Bash script?
 Loops in Bash scripts are used to execute a block of code multiple times. The for loop is the most commonly used loop in Bash, and it is used to iterate over a range of values or a list of items. The while loop is also commonly used to execute a block of code while a condition is true.
+
+API
+---
+
+What is the most important consideration when designing APIs and microservices?
+One of the most important considerations when designing APIs and microservices is to ensure that they are easily scalable and maintainable. This means that the architecture should be designed in a way that allows for seamless expansion as the user base grows, and that the system can be easily modified or updated without affecting the overall functionality.
+
+How do you ensure security in API and microservice design?
+Security should be a top consideration in API and microservice design, and there are several ways to ensure that the system is secure. This includes using secure authentication and authorization protocols, encrypting sensitive data, implementing proper access controls, and regularly testing and updating the system to identify and address potential vulnerabilities.
+
+What is the role of caching in API and microservice design?
+Caching can play an important role in API and microservice design by improving system performance and reducing the load on the server. By caching frequently accessed data, the system can respond more quickly to user requests and reduce the number of calls to the backend data store.
+
+How do you ensure high availability and fault tolerance in API and microservice design?
+To ensure high availability and fault tolerance, API and microservice design should incorporate redundancy and failover mechanisms, such as load balancing and clustering, to ensure that the system can continue to function in the event of a failure or outage.
+
+How do you handle versioning in API and microservice design?
+Versioning is an important consideration in API and microservice design, as it allows for the system to evolve and improve over time while maintaining compatibility with existing clients. One approach is to use version numbers in the API or microservice endpoint, and to have the server handle requests for different versions accordingly. Another approach is to use content negotiation to automatically detect and use the appropriate version of the API or microservice based on the client's capabilities.
+
+Design patterns
+--------------
+What is a design pattern in Java?
+A design pattern in Java is a reusable solution to a common software development problem. It is a way of organizing code and structuring programs to make them more modular, flexible, and maintainable.
+
+What is the Singleton pattern in Java and how is it implemented?
+The Singleton pattern in Java is a creational design pattern that ensures that a class has only one instance, and provides a global point of access to that instance. It is implemented by creating a private constructor, a private static instance of the class, and a public static method that returns the instance.
+
+What is the Observer pattern in Java and how is it implemented?
+The Observer pattern in Java is a behavioral design pattern that allows an object, called the subject, to notify other objects, called observers, when its state changes. It is implemented by defining an interface for the observer, an interface for the subject, and concrete classes that implement these interfaces.
+
+What is the Factory pattern in Java and how is it implemented?
+The Factory pattern in Java is a creational design pattern that provides an interface for creating objects in a superclass, but allows subclasses to alter the type of objects that will be created. It is implemented by creating an interface for the factory, and concrete classes that implement this interface to create objects.
+
+What is the Decorator pattern in Java and how is it implemented?
+The Decorator pattern in Java is a structural design pattern that allows behavior to be added to an individual object, either statically or dynamically, without affecting the behavior of other objects from the same class. It is implemented by creating a base interface or abstract class, concrete classes that implement this interface or class, and decorator classes that wrap the concrete classes to add behavior.
