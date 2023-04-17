@@ -1,3 +1,6 @@
+$ oc get pvc --all-namespaces -o jsonpath='{range .items[*]}{"PVC: "}{.metadata.namespace}/{.metadata.name}{"\tBound To: "}{.spec.volumeName}{"\tUsed By: "}{range .status.accessModes[*]}{.};{end}{"\n"}{end}'
+
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
