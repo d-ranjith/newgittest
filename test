@@ -21,6 +21,27 @@ for RUN in $RUNS; do
   done
 done
 
+#!/bin/bash
+
+# Set the OpenShift namespace to inspect
+NAMESPACE=<YOUR_NAMESPACE>
+
+# Get a list of all running PipelineRuns in the namespace
+RUNS=$(oc get pipelineruns -n $NAMESPACE --field-selector=status.phase=Running -o name)
+
+# Loop through the PipelineRuns and list the PVC claims assigned to each one
+for RUN in $RUNS; do
+  echo "PipelineRun: $(basename $RUN)"
+  # Get the list of PVC claims associated with the PipelineRun
+  CLAIMS=$(oc get pods -n $NAMESPACE -l tekton.dev/pipelineRun=$(basename $RUN) -o jsonpath='{range .items[*].spec.volumes[*]}{.persistentVolumeClaim.claimName}{"\n"}{end}' | grep -v 'null')
+  # Loop through the PVC claims and list their status
+  for CLAIM in $CLAIMS; do
+    STATUS=$(oc get pvc -n $NAMESPACE $CLAIM -o jsonpath='{.status.phase}')
+    echo "  PVC: $CLAIM  Status: $STATUS"
+  done
+done
+
+
 
 apiVersion: v1
 kind: ConfigMap
