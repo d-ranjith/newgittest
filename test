@@ -1,4 +1,6 @@
 $ oc get pvc --all-namespaces -o jsonpath='{range .items[*]}{"PVC: "}{.metadata.namespace}/{.metadata.name}{"\tBound To: "}{.spec.volumeName}{"\tUsed By: "}{range .status.accessModes[*]}{.};{end}{"\n"}{end}'
+$ oc logs -f $(oc get pods -l tekton.dev/pipelineRun=<PIPELINERUN_NAME> -o name) | grep -A 1 "Mounting pvc"
+
 
 
 apiVersion: v1
