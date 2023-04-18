@@ -1,3 +1,26 @@
+#!/bin/bash
+
+# Set the Tekton namespace
+TKN_NAMESPACE=<your-tekton-namespace>
+
+# Get a list of all PVCs in the Tekton namespace
+PVC_LIST=$(oc get pvc -n $TKN_NAMESPACE -o json | jq -r '.items[].metadata.name')
+
+# Loop over each PVC and check if it's in use by any running PipelineRuns
+for PVC in $PVC_LIST; do
+  # Get a list of all PipelineRuns that are still running and using the current PVC
+  RUNNING_RUNS=$(tkn pipelinerun list -n $TKN_NAMESPACE --condition status.conditions.status=True,status.conditions.type=Succeeded --field-selector 'status.pvcStatuses.name=='$PVC'' | awk '{print $1}')
+
+  # If there are no running PipelineRuns that are using the current PVC, delete it
+  if [[ -z "$RUNNING_RUNS" ]]; then
+    echo "Deleting PVC: $PVC"
+    oc delete pvc $PVC -n $TKN_NAMESPACE
+  else
+    echo "PVC is in use: $PVC"
+  fi
+done
+
+
 $ oc get pvc --all-namespaces -o jsonpath='{range .items[*]}{"PVC: "}{.metadata.namespace}/{.metadata.name}{"\tBound To: "}{.spec.volumeName}{"\tUsed By: "}{range .status.accessModes[*]}{.};{end}{"\n"}{end}'
 $ oc logs -f $(oc get pods -l tekton.dev/pipelineRun=<PIPELINERUN_NAME> -o name) | grep -A 1 "Mounting pvc"
 
