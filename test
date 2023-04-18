@@ -1,3 +1,6 @@
+oc get pvc --all-namespaces -o json | jq '.items[] | select(.status.phase == "Bound" and .spec.volumeName == null) | {Namespace: .metadata.namespace, Name: .metadata.name, Age: .metadata.creationTimestamp}'
+
+
 #!/bin/bash
 
 # Set the Tekton namespace
