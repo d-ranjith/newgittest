@@ -4,6 +4,50 @@ oc get pvc --all-namespaces -o json | jq '.items[] | select(.status.phase == "Bo
 
 set -e # Exit immediately if a command exits with a non-zero status
 
+# Define the namespace to search in
+NAMESPACE="<namespace>"
+
+# List all the PipelineRuns in the namespace
+PIPELINERUN_NAMES=$(oc get pipelinerun -n $NAMESPACE -o jsonpath='{.items[*].metadata.name}')
+
+# Loop through each PipelineRun and get the PVC names used in its TaskRuns
+for PIPELINERUN_NAME in $PIPELINERUN_NAMES; do
+  PIPELINERUN_JSON=$(oc get pipelinerun $PIPELINERUN_NAME -n $NAMESPACE -o json)
+  PIPELINERUN_STATUS=$(echo "$PIPELINERUN_JSON" | jq -r '.status.conditions[] | select(.type=="Succeeded").status')
+  
+  if [[ "$PIPELINERUN_STATUS" == "True" ]]; then
+    PVC_NAMES=$(echo "$PIPELINERUN_JSON" | jq -r '.status.volumes[].persistentVolumeClaim.claimName')
+    if [[ -n "$PVC_NAMES" ]]; then
+      # Loop through the PVC names and delete each PVC
+      for PVC_NAME in $PVC_NAMES; do
+        oc delete pvc $PVC_NAME -n $NAMESPACE --ignore-not-found=true
+        echo "Deleted PVC $PVC_NAME in PipelineRun $PIPELINERUN_NAME"
+      done
+    else
+      TASKRUNS=$(echo "$PIPELINERUN_JSON" | jq -r '.status.taskRuns[].name')
+      for TASKRUN in $TASKRUNS; do
+        TASKRUN_JSON=$(oc get taskrun $TASKRUN -n $NAMESPACE -o json)
+        PVC_NAMES=$(echo "$TASKRUN_JSON" | jq -r '.spec.inputs.artifacts[].from.name | select(startswith("pvc-"))')
+        if [[ -n "$PVC_NAMES" ]]; then
+          # Loop through the PVC names and delete each PVC
+          for PVC_NAME in $PVC_NAMES; do
+            oc delete pvc $PVC_NAME -n $NAMESPACE --ignore-not-found=true
+            echo "Deleted PVC $PVC_NAME in TaskRun $TASKRUN"
+          done
+        fi
+      done
+    fi
+  else
+    echo "PipelineRun $PIPELINERUN_NAME is not completed yet."
+  fi
+done
+
+
+
+#!/bin/bash
+
+set -e # Exit immediately if a command exits with a non-zero status
+
 # Define the PipelineRun name
 PIPELINERUN_NAME="<pipelinerun-name>"
 
