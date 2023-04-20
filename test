@@ -1,5 +1,13 @@
 oc get pvc --all-namespaces -o json | jq '.items[] | select(.status.phase == "Bound" and .spec.volumeName == null) | {Namespace: .metadata.namespace, Name: .metadata.name, Age: .metadata.creationTimestamp}'
 
+oc get pr | grep -E 'Succeeded|Failed' | awk '{print $1}' | while read -r each_pr; do
+  oc get pipelinerun "$each_pr" -ojsonpath='{.status.taskRuns[*].name}' | tr ' ' '\n' | while read -r each_tr; do
+    oc describe tr "$each_tr" | awk -F':' '/pvc/{print $2}' >> pvc-list.txt
+  done
+done
+cat pvc-list.txt | sort -u
+
+
 #!/bin/bash
 
 set -e # Exit immediately if a command exits with a non-zero status
