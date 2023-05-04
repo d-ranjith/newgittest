@@ -1,3 +1,41 @@
+const schema = Joi.object({
+  AenvClass: Joi.string().optional(),
+  BenvClass: Joi.string().optional(),
+  CenvClass: Joi.string().optional(),
+  serverclass: Joi.string().when(
+    Joi.object({
+      AenvClass: Joi.string().optional(),
+      BenvClass: Joi.string().optional(),
+      CenvClass: Joi.string().optional()
+    }).or('AenvClass', 'BenvClass', 'CenvClass'),
+    {
+      then: Joi.forbidden(),
+      otherwise: Joi.required()
+    }
+  )
+});
+
+const validInput = {
+  AenvClass: 'envA',
+  serverclass: 'class1'
+};
+
+const invalidInput = {
+  serverclass: 'class2'
+};
+
+describe('Schema Validation', () => {
+  test('valid input passes schema validation', () => {
+    const { error } = schema.validate(validInput);
+    expect(error).toBeUndefined();
+  });
+
+  test('invalid input fails schema validation', () => {
+    const { error } = schema.validate(invalidInput);
+    expect(error).toBeDefined();
+  });
+});
+
 oc get pvc --all-namespaces -o json | jq '.items[] | select(.status.phase == "Bound" and .spec.volumeName == null) | {Namespace: .metadata.namespace, Name: .metadata.name, Age: .metadata.creationTimestamp}'
 
 oc get pr | grep -E 'Succeeded|Failed' | awk '{print $1}' | while read -r each_pr; do
