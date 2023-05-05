@@ -1,9 +1,12 @@
 $folder = "C:\path\to\folder"
 
 Get-ChildItem -Path $folder | ForEach-Object {
+    $oldName = $_.Name
     $newName = $_.LastWriteTime.ToString("yyyyMMdd") + "_" + $_.BaseName.Replace("-","_") + $_.Extension
     Rename-Item -Path $_.FullName -NewName $newName -WhatIf
+    Write-Host "Renamed $oldName to $newName"
 }
+
 
 
 const schema = Joi.object({
