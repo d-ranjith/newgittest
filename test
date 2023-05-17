@@ -9,8 +9,15 @@ if [[ -z "$namespace" ]]; then
   exit 1
 fi
 
+# Check if oc command is available
+if command -v oc >/dev/null 2>&1; then
+  command="oc"
+else
+  command="kubectl"
+fi
+
 # Get the pod list sorted by creation time in reverse order
-pods=$(kubectl get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name" --sort-by='.metadata.creationTimestamp' | tac)
+pods=$($command get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name" --sort-by='.metadata.creationTimestamp' | tac)
 
 # Create the CSV file and write the header
 echo "Pod Name,Startup Time (seconds),Status" > "$output_file"
@@ -20,17 +27,17 @@ for pod in $pods; do
     echo "Processing pod: $pod"
 
     # Get the pod's creation time
-    creation_time=$(kubectl get pod "$pod" -n "$namespace" -o jsonpath='{.metadata.creationTimestamp}')
+    creation_time=$($command get pod "$pod" -n "$namespace" -o jsonpath='{.metadata.creationTimestamp}')
 
     # Get the pod's start time from events
     start_time=""
     while IFS= read -r line; do
-        event_type=$(echo "$line" | jq -r '.type')
+        event_type=$(echo "$line" | awk '{print $3}')
         if [[ "$event_type" == "Normal" ]]; then
-            start_time=$(echo "$line" | jq -r '.firstTimestamp')
+            start_time=$(echo "$line" | awk '{print $1}')
             break
         fi
-    done < <(kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o json | tac)
+    done < <($command get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o custom-columns=":firstTimestamp" | tac)
 
     if [[ -z "$start_time" ]]; then
         echo "No startup event found for pod: $pod"
@@ -43,7 +50,7 @@ for pod in $pods; do
     startup_time=$((start_timestamp - creation_timestamp))
 
     # Get the pod's status
-    pod_status=$(kubectl get pod "$pod" -n "$namespace" -o jsonpath='{.status.phase}')
+    pod_status=$($command get pod "$pod" -n "$namespace" -o jsonpath='{.status.phase}')
 
     echo "Pod: $pod, Startup time: $startup_time seconds, Status: $pod_status"
 
