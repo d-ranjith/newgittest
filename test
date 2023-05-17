@@ -26,11 +26,11 @@ for pod in $pods; do
     start_time=""
     while IFS= read -r line; do
         event_type=$(echo "$line" | awk '{print $3}')
-        if [[ "$event_type" == "Started" ]]; then
+        if [[ "$event_type" == "Normal" ]]; then
             start_time=$(echo "$line" | awk '{print $1}')
             break
         fi
-    done < <(kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp' --no-headers -o custom-columns=":firstTimestamp" | tac)
+    done < <(kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o custom-columns=":firstTimestamp")
 
     if [[ -z "$start_time" ]]; then
         echo "No startup event found for pod: $pod"
@@ -52,6 +52,7 @@ for pod in $pods; do
 done
 
 echo "Output written to $output_file"
+
 
 
 
