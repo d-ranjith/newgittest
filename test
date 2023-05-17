@@ -31,12 +31,13 @@ for pod in $pods; do
 
     # Get the pod's start time from events
     events_file=$(mktemp)
-    $command get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o custom-columns=":firstTimestamp" | tac > "$events_file"
+    $command get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o custom-columns="FIRST_TIMESTAMP:.firstTimestamp,TYPE:.type,REASON:.reason" | tac > "$events_file"
 
     start_time=""
     while IFS= read -r line; do
-        event_type=$(echo "$line" | awk '{print $1}')
-        if [[ "$event_type" == "Normal" ]]; then
+        event_type=$(echo "$line" | awk '{print $2" "$3}')
+        reason=$(echo "$line" | awk '{print $4}')
+        if [[ "$event_type" == "Normal" && "$reason" == "Started" ]]; then
             start_time=$(echo "$line" | awk '{print $1}')
             break
         fi
@@ -64,6 +65,7 @@ for pod in $pods; do
 done
 
 echo "Output written to $output_file"
+
 
 
 
