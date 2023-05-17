@@ -12,7 +12,7 @@ fi
 pods=$(oc get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
 
 # Create the CSV file and write the header
-echo "Pod Name,Startup Time (seconds)" > "$output_file"
+echo "Pod Name,Startup Time (seconds),Status" > "$output_file"
 
 # Iterate over each pod
 for pod in $pods; do
@@ -29,13 +29,17 @@ for pod in $pods; do
     start_timestamp=$(date -d "$start_time" +%s)
     startup_time=$((start_timestamp - creation_timestamp))
 
-    echo "Pod: $pod, Startup time: $startup_time seconds"
+    # Get the pod's status
+    pod_status=$(oc get pod "$pod" -n "$namespace" -o jsonpath='{.status.phase}')
 
-    # Append the pod name and startup time to the CSV file
-    echo "$pod,$startup_time" >> "$output_file"
+    echo "Pod: $pod, Startup time: $startup_time seconds, Status: $pod_status"
+
+    # Append the pod name, startup time, and status to the CSV file
+    echo "$pod,$startup_time,$pod_status" >> "$output_file"
 done
 
 echo "Output written to $output_file"
+
 
 
 
