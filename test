@@ -19,11 +19,11 @@ echo "Pod Name,Startup Time (seconds),Status" > "$output_file"
 for pod in $pods; do
     echo "Processing pod: $pod"
 
-    # Get the pod's creation timestamp
+    # Get the pod's creation time
     creation_time=$(oc get pod "$pod" -n "$namespace" -o jsonpath='{.metadata.creationTimestamp}')
 
-    # Get the pod's start time
-    start_time=$(oc logs "$pod" -n "$namespace" --timestamps --tail=1 | awk '{print $1}')
+    # Get the pod's start time from events
+    start_time=$(oc get events -n "$namespace" --field-selector involvedObject.name="$pod",reason=Started --sort-by='{.lastTimestamp}' --no-headers -o jsonpath='{.items[-1].firstTimestamp}')
 
     # Calculate the startup time
     creation_timestamp=$(date -d "$creation_time" +%s)
@@ -40,6 +40,7 @@ for pod in $pods; do
 done
 
 echo "Output written to $output_file"
+
 
 
 
