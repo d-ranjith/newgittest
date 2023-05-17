@@ -25,6 +25,11 @@ for pod in $pods; do
     # Get the pod's start time from events
     start_time=$(oc get events -n "$namespace" --field-selector involvedObject.name="$pod",reason=Started --sort-by='{.lastTimestamp}' --no-headers -o jsonpath='{.items[-1].firstTimestamp}')
 
+    if [[ -z "$start_time" ]]; then
+        echo "No startup event found for pod: $pod"
+        continue
+    fi
+
     # Calculate the startup time
     creation_timestamp=$(date -d "$creation_time" +%s)
     start_timestamp=$(date -d "$start_time" +%s)
@@ -40,6 +45,7 @@ for pod in $pods; do
 done
 
 echo "Output written to $output_file"
+
 
 
 
