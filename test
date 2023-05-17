@@ -9,8 +9,8 @@ if [[ -z "$namespace" ]]; then
   exit 1
 fi
 
-# Get the pod list
-pods=$(kubectl get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
+# Get the pod list sorted by creation time in reverse order
+pods=$(kubectl get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name" --sort-by='.metadata.creationTimestamp' | tac)
 
 # Create the CSV file and write the header
 echo "Pod Name,Startup Time (seconds),Status" > "$output_file"
@@ -25,12 +25,12 @@ for pod in $pods; do
     # Get the pod's start time from events
     start_time=""
     while IFS= read -r line; do
-        event_type=$(echo "$line" | awk '{print $3}')
+        event_type=$(echo "$line" | jq -r '.type')
         if [[ "$event_type" == "Normal" ]]; then
-            start_time=$(echo "$line" | awk '{print $1}')
+            start_time=$(echo "$line" | jq -r '.firstTimestamp')
             break
         fi
-    done < <(kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o custom-columns=":firstTimestamp")
+    done < <(kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --no-headers -o json | tac)
 
     if [[ -z "$start_time" ]]; then
         echo "No startup event found for pod: $pod"
@@ -52,6 +52,7 @@ for pod in $pods; do
 done
 
 echo "Output written to $output_file"
+
 
 
 
