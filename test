@@ -1,6 +1,7 @@
 #!/bin/bash
 
 namespace="$1"
+output_file="pod_startup_times.csv"
 
 if [[ -z "$namespace" ]]; then
   echo "Please provide a namespace as an argument."
@@ -10,9 +11,12 @@ fi
 # Get the pod list
 pods=$(oc get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
 
+# Create the CSV file and write the header
+echo "Pod Name,Startup Time (seconds)" > "$output_file"
+
 # Iterate over each pod
 for pod in $pods; do
-    echo "Pod: $pod"
+    echo "Processing pod: $pod"
 
     # Get the pod's creation timestamp
     creation_time=$(oc get pod "$pod" -n "$namespace" -o jsonpath='{.metadata.creationTimestamp}')
@@ -25,9 +29,14 @@ for pod in $pods; do
     start_timestamp=$(date -d "$start_time" +%s)
     startup_time=$((start_timestamp - creation_timestamp))
 
-    echo "Startup time: $startup_time seconds"
-    echo
+    echo "Pod: $pod, Startup time: $startup_time seconds"
+
+    # Append the pod name and startup time to the CSV file
+    echo "$pod,$startup_time" >> "$output_file"
 done
+
+echo "Output written to $output_file"
+
 
 
 
