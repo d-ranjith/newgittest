@@ -10,7 +10,7 @@ if [[ -z "$namespace" ]]; then
 fi
 
 # Get the pod list
-pods=$(oc get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
+pods=$(kubectl get pods -n "$namespace" --no-headers -o custom-columns=":metadata.name")
 
 # Create the CSV file and write the header
 echo "Pod Name,Startup Time (seconds),Status" > "$output_file"
@@ -20,7 +20,7 @@ for pod in $pods; do
     echo "Processing pod: $pod"
 
     # Get the pod's creation time
-    creation_time=$(oc get pod "$pod" -n "$namespace" -o jsonpath='{.metadata.creationTimestamp}')
+    creation_time=$(kubectl get pod "$pod" -n "$namespace" -o jsonpath='{.metadata.creationTimestamp}')
 
     # Get the pod's start time from events
     start_time=""
@@ -30,7 +30,7 @@ for pod in $pods; do
             start_time=$(echo "$line" | awk '{print $1}')
             break
         fi
-    done < <(oc get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='{.lastTimestamp}' --no-headers -o custom-columns=":firstTimestamp" | tac)
+    done < <(kubectl get events -n "$namespace" --field-selector involvedObject.name="$pod" --sort-by='.lastTimestamp' --no-headers -o custom-columns=":firstTimestamp" | tac)
 
     if [[ -z "$start_time" ]]; then
         echo "No startup event found for pod: $pod"
@@ -43,7 +43,7 @@ for pod in $pods; do
     startup_time=$((start_timestamp - creation_timestamp))
 
     # Get the pod's status
-    pod_status=$(oc get pod "$pod" -n "$namespace" -o jsonpath='{.status.phase}')
+    pod_status=$(kubectl get pod "$pod" -n "$namespace" -o jsonpath='{.status.phase}')
 
     echo "Pod: $pod, Startup time: $startup_time seconds, Status: $pod_status"
 
