@@ -1,7 +1,8 @@
 #!/bin/bash
 
 namespace="$1"
-output_file="pod_startup_times.csv"
+timestamp=$(date +"%Y%m%d%H%M%S")
+output_file="pod_startup_times_${timestamp}.csv"
 
 if [[ -z "$namespace" ]]; then
   echo "Please provide a namespace as an argument."
@@ -39,6 +40,7 @@ for pod in $pods; do
 done
 
 echo "Output written to $output_file"
+
 
 
 
