@@ -1,3 +1,31 @@
+#!/bin/bash
+
+namespace="<namespace>"
+
+# Get the pod list
+pods=$(oc get pods -n $namespace --no-headers -o custom-columns=":metadata.name")
+
+# Iterate over each pod
+for pod in $pods; do
+    echo "Pod: $pod"
+
+    # Get the pod's creation timestamp
+    creation_time=$(oc get pod $pod -n $namespace -o jsonpath='{.metadata.creationTimestamp}')
+
+    # Get the pod's start time
+    start_time=$(oc logs $pod -n $namespace --timestamps --tail=1 | awk '{print $1}')
+
+    # Calculate the startup time
+    creation_timestamp=$(date -d $creation_time +%s)
+    start_timestamp=$(date -d $start_time +%s)
+    startup_time=$((start_timestamp - creation_timestamp))
+
+    echo "Startup time: $startup_time seconds"
+    echo
+done
+
+
+
 $folder = "C:\path\to\folder"
 
 Get-ChildItem -Path $folder | ForEach-Object {
