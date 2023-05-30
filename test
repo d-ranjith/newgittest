@@ -1,3 +1,58 @@
+# Function to generate a new Task YAML file based on the base template
+function Generate-Task {
+    param (
+        [string]$TaskName,
+        [string]$Param1Desc,
+        [string]$Param2Desc
+    )
+
+    $Template = Get-Content -Raw -Path "base-task.yaml"
+    $TaskContent = $Template -replace "{{TASK_NAME}}", $TaskName -replace "{{PARAM1_DESC}}", $Param1Desc -replace "{{PARAM2_DESC}}", $Param2Desc
+    $TaskContent | Out-File -FilePath "$TaskName.yaml" -Encoding UTF8
+}
+
+# Prompt the user for input
+$TaskName = Read-Host "Enter task name"
+$Param1Desc = Read-Host "Enter description for parameter 1"
+$Param2Desc = Read-Host "Enter description for parameter 2"
+
+# Generate new Task YAML file
+Generate-Task -TaskName $TaskName -Param1Desc $Param1Desc -Param2Desc $Param2Desc
+
+Write-Host "Task YAML file generated successfully."
+
+#!/bin/bash
+
+# Function to generate a new Task YAML file based on the base template
+function generate_task() {
+  TEMPLATE=$(<base-task.yaml)
+  TASK_NAME=$1
+  PARAM1_DESC=$2
+  PARAM2_DESC=$3
+
+  # Update task name
+  TASK_CONTENT=${TEMPLATE//"{{TASK_NAME}}"/$TASK_NAME}
+
+  # Update parameter descriptions
+  TASK_CONTENT=${TASK_CONTENT//"{{PARAM1_DESC}}"/$PARAM1_DESC}
+  TASK_CONTENT=${TASK_CONTENT//"{{PARAM2_DESC}}"/$PARAM2_DESC}
+
+  echo "$TASK_CONTENT" > "$TASK_NAME.yaml"
+}
+
+# Prompt the user for input
+read -p "Enter task name: " TASK_NAME
+read -p "Enter description for parameter 1: " PARAM1_DESC
+read -p "Enter description for parameter 2: " PARAM2_DESC
+
+# Generate new Task YAML file
+generate_task "$TASK_NAME" "$PARAM1_DESC" "$PARAM2_DESC"
+
+echo "Task YAML file generated successfully."
+
+
+
+
 #!/bin/bash
 
 namespace="$1"
