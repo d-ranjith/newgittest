@@ -72,6 +72,29 @@ custom-contrib-template/
 │   └── post_template.sh
 └── generic.sh
 
+#!/bin/bash
+
+# Load the configuration from config.yaml
+config=$(cat config.yaml)
+
+# Parse the enabled features from the configuration
+enabled_features=$(echo "$config" | awk '/enabled: true/ { getline; print $2 }')
+
+# Loop through the enabled features and execute the corresponding script
+for feature in $enabled_features; do
+    case $feature in
+        feature1)
+            ./bash/feature1.sh
+            ;;
+        feature2)
+            ./bash/feature2.sh
+            ;;
+        # Add more cases for additional features if needed
+        *)
+            echo "Unknown feature: $feature"
+            ;;
+    esac
+done
 
 
 
