@@ -1,0 +1,364 @@
+template:
+  name: custom-contrib-template
+  path: 1.0.0/templates/java/template1
+  version: 1.0.0
+
+features:
+  - name: download-artifacts
+    enabled: true
+
+  - name: perform-deploy
+    enabled: true
+
+pre_script: scripts/pre_template.sh
+post_script: scripts/post_template.sh
+
+
+
+
+apigee-contrib-template
+
+custom-contrib-template/
+├── 1.0.0/
+│   ├── templates/
+│   │   ├── java/
+│   │   │   ├── template1/
+│   │   │   │   ├── src/
+│   │   │   │   │   ├── Main.java
+│   │   │   │   │   └── Feature1Implementation.java
+│   │   │   │   └── pom.xml
+│   │   │   ├── template1-feature1/
+│   │   │   │   ├── src/
+│   │   │   │   │   ├── Main.java
+│   │   │   │   │   └── Feature1Implementation.java
+│   │   │   │   └── pom.xml
+│   │   │   └── template1-feature2/
+│   │   │       ├── src/
+│   │   │       │   ├── Main.java
+│   │   │       │   └── Feature2Implementation.java
+│   │   │       └── pom.xml
+│   │   ├── python/
+│   │   │   ├── template1/
+│   │   │   │   ├── main.py
+│   │   │   │   └── requirements.txt
+│   │   │   ├── template1-feature1/
+│   │   │   │   ├── main.py
+│   │   │   │   └── feature1.py
+│   │   │   └── template1-feature2/
+│   │   │       ├── main.py
+│   │   │       └── feature2.py
+│   │   ├── node/
+│   │   │   ├── template1/
+│   │   │   │   ├── index.js
+│   │   │   │   └── package.json
+│   │   │   ├── template1-feature1/
+│   │   │   │   ├── index.js
+│   │   │   │   └── feature1.js
+│   │   │   └── template1-feature2/
+│   │   │       ├── index.js
+│   │   │       └── feature2.js
+│   │   └── bash/
+│   │       ├── template1/
+│   │       │   ├── main.sh
+│   │       ├── template1-feature1/
+│   │       │   ├── feature1.sh
+│   │       └── template1-feature2/
+│   │           └── feature2.sh
+│   └── config.yaml
+├── 1.0.0-rc/
+│   └── ...
+├── scripts/
+│   ├── pre_template.sh
+│   └── post_template.sh
+└── generic.sh
+
+
+
+
+snowflake-contrib-template
+
+oracle-contrib-template
+
+
+# Stage 1: Build template version 1.0.0-rc
+FROM <base_image> as template1-1.0.0-rc
+COPY 1.0.0-rc/templates /app
+WORKDIR /app
+# Additional build steps for template version 1.0.0-rc
+
+# Set an environment variable to indicate the version
+ENV TEMPLATE_VERSION=1.0.0-rc
+
+# Stage 2: Combine template versions into final image
+FROM <base_image>
+WORKDIR /app
+COPY --from=template1-1.0.0-rc /app /app/template1-1.0.0-rc
+
+
+ENTRYPOINT [ "deploy.sh" ]
+
+
+
+#!/bin/bash
+
+# Source the config.yaml file to access the configuration
+source config.yaml
+
+# Check if the feature1 is enabled and execute its script if true
+if [[ "${features[0].enabled}" == "true" ]]; then
+  bash feature1.sh
+fi
+
+# Check if the feature2 is enabled and execute its script if true
+if [[ "${features[1].enabled}" == "true" ]]; then
+  bash feature2.sh
+fi
+
+# Run the pre_script defined in the config.yaml
+bash "${pre_script}"
+
+# Run the post_script defined in the config.yaml
+bash "${post_script}"
+
+
+generic.sh
+#!/bin/bash
+
+# Load the configuration from config.yaml
+config=$(cat config.yaml)
+
+# Parse the enabled features from the configuration
+enabled_features=$(echo "$config" | yq -r '.features[] | select(.enabled == true) | .name')
+
+# Loop through the enabled features and execute the corresponding script
+for feature in $enabled_features; do
+    case $feature in
+        feature1)
+            ./bash/feature1.sh
+            ;;
+        feature2)
+            ./bash/feature2.sh
+            ;;
+        # Add more cases for additional features if needed
+        *)
+            echo "Unknown feature: $feature"
+            ;;
+    esac
+done
+
+
+generic.py
+import subprocess
+import yaml
+
+# Load the configuration from config.yaml
+with open('config.yaml') as f:
+    config = yaml.safe_load(f)
+
+# Parse the enabled features from the configuration
+enabled_features = [feature['name'] for feature in config['features'] if feature['enabled']]
+
+# Loop through the enabled features and execute the corresponding script
+for feature in enabled_features:
+    if feature == 'feature1':
+        subprocess.run(['bash', './bash/feature1.sh'])
+    elif feature == 'feature2':
+        subprocess.run(['bash', './bash/feature2.sh'])
+    else:
+        print(f"Unknown feature: {feature}")
+
+
+
+
+FROM openjdk:11
+
+WORKDIR /app
+
+# Copy the JAR file from the Maven build artifact location to the Docker image
+COPY 1.0.0/templates/java/template1/target/my-application.jar .
+
+# Run the application
+CMD ["java", "-jar", "my-application.jar"]
+
+
+
+
+FROM node:14
+
+WORKDIR /app
+
+# Copy the package.json and package-lock.json files to install dependencies
+COPY 1.0.0/templates/node/template1/package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy the source code to the Docker image
+COPY 1.0.0/templates/node/template1 .
+
+# Build the application (specific to your project configuration)
+RUN npm run build
+
+# Run the application
+CMD ["node", "index.js"]
+
+
+
+FROM python:3.9
+
+WORKDIR /app
+
+# Copy the requirements.txt file to install dependencies
+COPY 1.0.0/templates/python/template1/requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the source code to the Docker image
+COPY 1.0.0/templates/python/template1 .
+
+# Run the application (specific to your project configuration)
+CMD ["python", "main.py"]
+
+
+
+
+mkdir custom-contrib-template
+cd custom-contrib-template
+
+mkdir 1.0.0
+cd 1.0.0
+
+mkdir templates
+cd templates
+
+mkdir java
+cd java
+
+mkdir template1
+cd template1
+
+mkdir src
+cd src
+echo. > Main.java
+echo. > Feature1Implementation.java
+cd ..
+
+echo. > pom.xml
+cd ..
+
+mkdir template1-feature1
+cd template1-feature1
+
+mkdir src
+cd src
+echo. > Main.java
+echo. > Feature1Implementation.java
+cd ..
+
+echo. > pom.xml
+cd ..
+
+mkdir template1-feature2
+cd template1-feature2
+
+mkdir src
+cd src
+echo. > Main.java
+echo. > Feature2Implementation.java
+cd ..
+
+echo. > pom.xml
+cd ..
+
+cd ..
+
+mkdir python
+cd python
+
+mkdir template1
+cd template1
+echo. > main.py
+echo. > requirements.txt
+cd ..
+
+mkdir template1-feature1
+cd template1-feature1
+echo. > main.py
+echo. > feature1.py
+cd ..
+
+mkdir template1-feature2
+cd template1-feature2
+echo. > main.py
+echo. > feature2.py
+cd ..
+
+cd ..
+
+mkdir node
+cd node
+
+mkdir template1
+cd template1
+echo. > index.js
+echo. > package.json
+cd ..
+
+mkdir template1-feature1
+cd template1-feature1
+echo. > index.js
+echo. > feature1.js
+cd ..
+
+mkdir template1-feature2
+cd template1-feature2
+echo. > index.js
+echo. > feature2.js
+cd ..
+
+cd ..
+
+mkdir bash
+cd bash
+
+mkdir template1
+cd template1
+echo. > feature1.sh
+echo. > feature2.sh
+cd ..
+
+mkdir template1-feature1
+cd template1-feature1
+echo. > feature1.sh
+cd ..
+
+mkdir template1-feature2
+cd template1-feature2
+echo. > feature2.sh
+cd ..
+
+cd ..
+
+cd ..
+
+mkdir 1.0.0-rc
+cd 1.0.0-rc
+
+mkdir bash
+cd bash
+
+mkdir template1
+cd template1
+echo. > feature1.sh
+echo. > feature2.sh
+cd ..
+
+cd ../../../..
+
+echo. > config.yaml
+
+mkdir scripts
+cd scripts
+echo. > pre_template.sh
+echo. > post_template.sh
