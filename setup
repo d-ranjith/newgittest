@@ -1,19 +1,53 @@
 const fs = require('fs');
+const { execSync } = require('child_process');
 const yaml = require('js-yaml');
 
 // Read the YAML file
-let yamlContent = fs.readFileSync('config.yaml', 'utf8');
+const yamlContent = fs.readFileSync('config.yaml', 'utf8');
 
-// Get the version from the environment variable
-const version = process.env.VERSION;
-
-// Perform variable substitution
-yamlContent = yamlContent.replace(/{{version}}/g, version);
-
-// Parse the modified YAML content
+// Parse the YAML content
 const config = yaml.load(yamlContent);
 
-console.log(config);
+// Extract the enabled features
+const enabledFeatures = config.features.filter((feature) => feature.enabled).map((feature) => feature.name);
+
+// Execute scripts based on the enabled features
+enabledFeatures.forEach((feature) => {
+    switch (feature) {
+        case 'feature1':
+            execSync('./bash/feature1.sh');
+            break;
+        case 'feature2':
+            execSync('./bash/feature2.sh');
+            break;
+        // Add more cases for additional features if needed
+        default:
+            console.log(`Unknown feature: ${feature}`);
+            break;
+    }
+});
+
+{
+  "name": "your-project",
+  "version": "1.0.0",
+  "description": "Your project description",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "lint": "eslint .",
+    "test": "echo \"No tests specified\""
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "js-yaml": "^4.2.1"
+  },
+  "devDependencies": {
+    "eslint": "^7.32.0"
+  }
+}
+
+
 
 
 template:
