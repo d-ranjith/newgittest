@@ -1,69 +1,23 @@
 const fs = require('fs');
-const { execSync } = require('child_process');
 const yaml = require('js-yaml');
 
-// Read the YAML file
-const yamlContent = fs.readFileSync('config.yaml', 'utf8');
+describe('Configurations', () => {
+  it('should have VERSION environment variable set and config.yaml loaded with updated version', () => {
+    // Check if VERSION environment variable is set
+    expect(process.env.VERSION).toBeDefined();
 
-// Parse the YAML content
-const config = yaml.load(yamlContent);
+    // Read the YAML file
+    const yamlContent = fs.readFileSync('config.yaml', 'utf8');
 
-// Extract the enabled features
-const enabledFeatures = config.features.filter((feature) => feature.enabled).map((feature) => feature.name);
+    // Parse the YAML content
+    const config = yaml.load(yamlContent);
 
-// Execute scripts based on the enabled features
-enabledFeatures.forEach((feature) => {
-    switch (feature) {
-        case 'feature1':
-            execSync('./bash/feature1.sh');
-            break;
-        case 'feature2':
-            execSync('./bash/feature2.sh');
-            break;
-        // Add more cases for additional features if needed
-        default:
-            console.log(`Unknown feature: ${feature}`);
-            break;
-    }
+    // Check if config.yaml contains the updated version
+    expect(config.template.version).toBe(process.env.VERSION);
+    expect(config.template.path).toBe(`${process.env.VERSION}/templates/node/template1`);
+  });
 });
 
-{
-  "name": "your-project",
-  "version": "1.0.0",
-  "description": "Your project description",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "lint": "eslint .",
-    "test": "echo \"No tests specified\""
-  },
-  "author": "Your Name",
-  "license": "MIT",
-  "dependencies": {
-    "js-yaml": "^4.2.1"
-  },
-  "devDependencies": {
-    "eslint": "^7.32.0"
-  }
-}
-
-
-
-
-template:
-  name: custom-contrib-template
-  path: 1.0.0/templates/java/template1
-  version: 1.0.0
-
-features:
-  - name: download-artifacts
-    enabled: true
-
-  - name: perform-deploy
-    enabled: true
-
-pre_script: scripts/pre_template.sh
-post_script: scripts/post_template.sh
 
 
 
