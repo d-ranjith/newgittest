@@ -1,3 +1,21 @@
+const fs = require('fs');
+const yaml = require('js-yaml');
+
+// Read the YAML file
+let yamlContent = fs.readFileSync('config.yaml', 'utf8');
+
+// Get the version from the environment variable
+const version = process.env.VERSION;
+
+// Perform variable substitution
+yamlContent = yamlContent.replace(/{{version}}/g, version);
+
+// Parse the modified YAML content
+const config = yaml.load(yamlContent);
+
+console.log(config);
+
+
 template:
   name: custom-contrib-template
   path: 1.0.0/templates/java/template1
