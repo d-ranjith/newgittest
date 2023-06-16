@@ -4,6 +4,7 @@ import tarfile
 import logging
 import json
 import datetime
+import secrets
 
 class FileDownloader:
     def download_file(self, url):
@@ -27,14 +28,14 @@ class TgzFileDownloader(FileDownloader):
             tar.extractall(output_dir)
 
 class APIUploader:
-    def __init__(self, logger, username, password):
+    def __init__(self, logger, username=None, password=None):
         self.logger = logger
-        self.username = username
-        self.password = password
+        self.username = username or secrets.username
+        self.password = password or secrets.password
 
     def upload_file(self, file_path):
         self.logger.info("Uploading file to API...")
-        # Upload implementation
+        # Secure upload implementation
         # Use self.username and self.password for authentication
         pass
 
@@ -100,4 +101,3 @@ class MyApp:
 
         with open(log_file, "w") as file:
             json.dump(log_data, file, indent=4)
-
