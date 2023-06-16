@@ -25,9 +25,9 @@ class TgzFileDownloader(FileDownloader):
             tar.extractall(output_dir)
 
 class ArtifactoryDownloader:
-    def __init__(self, file_downloader):
+    def __init__(self, file_downloader, logger):
         self.file_downloader = file_downloader
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def download_and_extract_file(self, file_url, output_dir):
         self.logger.info("Downloading file from Artifactory...")
@@ -53,12 +53,12 @@ class ArtifactoryDownloader:
 
 # Main application
 class MyApp:
-    def __init__(self, file_downloader):
+    def __init__(self, file_downloader, logger):
         self.file_downloader = file_downloader
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def process_artifact(self, file_url, output_dir):
-        artifactory_downloader = ArtifactoryDownloader(self.file_downloader)
+        artifactory_downloader = ArtifactoryDownloader(self.file_downloader, self.logger)
         extracted_file_path = artifactory_downloader.download_and_extract_file(file_url, output_dir)
 
         if extracted_file_path:
@@ -70,9 +70,10 @@ class MyApp:
 # Usage in main.py
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logger = logging.getLogger(__name__)
 
     file_downloader = TgzFileDownloader()
-    app = MyApp(file_downloader)
+    app = MyApp(file_downloader, logger)
 
     # Example usage
     artifact_url = "https://example.com/file.tgz"
