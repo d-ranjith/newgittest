@@ -18,26 +18,32 @@ from api_uploader import APIUploader
 app = typer.Typer()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO,
-                    format="[%(levelname)s] %(asctime)s %(message)s",
-                    datefmt="%Y-%m-%d %H:%M:%S")
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
 
 # Create a logger
 logger = logging.getLogger(__name__)
+
 
 def load_environment_variables():
     if os.environ.get("ENV") == "dev":
         load_dotenv()
 
+
 @app.command()
-def process_artifact(json_logging: bool = False,
-                     artifactory_username: str = os.environ.get("ARTIFACTORY_USERNAME"),
-                     artifactory_password: str = os.environ.get("ARTIFACTORY_PASSWORD"),
-                     artifact_url: str = os.environ.get("ARTIFACT_URL"),
-                     output_dir: str = os.environ.get("OUTPUT_DIR"),
-                     api_username: str = os.environ.get("API_USERNAME"),
-                     api_password: str = os.environ.get("API_PASSWORD"),
-                     api_url: str = os.environ.get("API_URL")):
+def process_artifact(
+    json_logging: bool = typer.Option(False, "--json_logging", help="Enable JSON logging"),
+    artifactory_username: str = typer.Option(
+        None, "--artifactory_username", help="Artifactory username", envvar="ARTIFACTORY_USERNAME"
+    ),
+    artifactory_password: str = typer.Option(
+        None, "--artifactory_password", help="Artifactory password", envvar="ARTIFACTORY_PASSWORD"
+    ),
+    artifact_url: str = typer.Option(None, "--artifact_url", help="Artifact URL", envvar="ARTIFACT_URL"),
+    output_dir: str = typer.Option(None, "--output_dir", help="Output directory", envvar="OUTPUT_DIR"),
+    api_username: str = typer.Option(None, "--api_username", help="API username", envvar="API_USERNAME"),
+    api_password: str = typer.Option(None, "--api_password", help="API password", envvar="API_PASSWORD"),
+    api_url: str = typer.Option(None, "--api_url", help="API URL", envvar="API_URL"),
+):
     # Configure JSON logging if enabled
     if json_logging:
         logger.handlers = [logging.StreamHandler()]
@@ -63,6 +69,7 @@ def process_artifact(json_logging: bool = False,
         logger.info("Artifact uploaded to the API endpoint successfully.")
     else:
         logger.error("Failed to upload the artifact to the API endpoint.")
+
 
 if __name__ == "__main__":
     load_environment_variables()
