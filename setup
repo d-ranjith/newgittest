@@ -1,3 +1,4 @@
+import os
 import requests
 import tarfile
 import logging
@@ -6,14 +7,75 @@ class FileDownloader:
     def download_file(self, url):
         raise NotImplementedError
 
-    def extract_file(self, file_path):
+    def extract_file(self, file_path, output_dir):
         raise NotImplementedError
 
 class TgzFileDownloader(FileDownloader):
     def download_file(self, url):
         # Download .tgz file implementation
-        pass
+        response = requests.get(url, verify=False)
+        if response.status_code == 200:
+            # Save the downloaded file
+            with open("downloaded_file.tgz", "wb") as file:
+                file.write(response.content)
 
-    def extract_file(self, file_path):
+    def extract_file(self, file_path, output_dir):
         # Extract .tgz file implementation
-        pass
+        with tarfile.open(file_path, "r:gz") as tar:
+            tar.extractall(output_dir)
+
+class ArtifactoryDownloader:
+    def __init__(self, file_downloader):
+        self.file_downloader = file_downloader
+        self.logger = logging.getLogger(__name__)
+
+    def download_and_extract_file(self, file_url, output_dir):
+        self.logger.info("Downloading file from Artifactory...")
+        self.file_downloader.download_file(file_url)
+
+        downloaded_file_path = os.path.join(os.getcwd(), "downloaded_file.tgz")
+        if os.path.exists(downloaded_file_path):
+            self.logger.info("File downloaded successfully.")
+
+            self.logger.info("Extracting file...")
+            self.file_downloader.extract_file(downloaded_file_path, output_dir)
+            self.logger.info("File extracted successfully.")
+
+            os.remove(downloaded_file_path)
+            self.logger.info("Temporary file removed.")
+
+            extracted_file_path = os.path.join(output_dir, "extracted_file.txt")
+
+            return extracted_file_path
+        else:
+            self.logger.error("Failed to download the file.")
+            return None
+
+# Main application
+class MyApp:
+    def __init__(self, file_downloader):
+        self.file_downloader = file_downloader
+        self.logger = logging.getLogger(__name__)
+
+    def process_artifact(self, file_url, output_dir):
+        artifactory_downloader = ArtifactoryDownloader(self.file_downloader)
+        extracted_file_path = artifactory_downloader.download_and_extract_file(file_url, output_dir)
+
+        if extracted_file_path:
+            self.logger.info("Artifact downloaded and extracted successfully.")
+            # Perform further processing or actions with the extracted file
+        else:
+            self.logger.error("Failed to download and extract the artifact.")
+
+# Usage in main.py
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(asctime)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+    file_downloader = TgzFileDownloader()
+    app = MyApp(file_downloader)
+
+    # Example usage
+    artifact_url = "https://example.com/file.tgz"
+    output_dir = "/path/to/output/dir"
+
+    app.process_artifact(artifact_url, output_dir)
