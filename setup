@@ -1,3 +1,343 @@
+import requests
+import zipfile
+import tarfile
+
+# Strategy interfaces
+class FileDownloader:
+    def download_file(self, url):
+        raise NotImplementedError
+
+    def extract_file(self, file_path):
+        raise NotImplementedError
+
+class APIUploader:
+    def upload_file(self, file_path):
+        raise NotImplementedError
+
+# Concrete strategy classes for file formats
+class TgzFileDownloader(FileDownloader):
+    def download_file(self, url):
+        response = requests.get(url)
+        file_path = "downloaded_file.tgz"
+
+        with open(file_path, "wb") as file:
+            file.write(response.content)
+
+        return file_path
+
+    def extract_file(self, file_path):
+        with tarfile.open(file_path, "r:gz") as tar:
+            tar.extractall()
+
+class ZipFileDownloader(FileDownloader):
+    def download_file(self, url):
+        response = requests.get(url)
+        file_path = "downloaded_file.zip"
+
+        with open(file_path, "wb") as file:
+            file.write(response.content)
+
+        return file_path
+
+    def extract_file(self, file_path):
+        with zipfile.ZipFile(file_path, "r") as zip_ref:
+            zip_ref.extractall()
+
+# Concrete strategy classes for endpoints
+class CertAPIUploader(APIUploader):
+    def __init__(self, endpoint, cert_path, username, password):
+        self.endpoint = endpoint
+        self.cert_path = cert_path
+        self.username = username
+        self.password = password
+
+    def upload_file(self, file_path):
+        # Upload to endpoint with certificate authentication
+        # Your implementation here
+        pass
+
+class NonCertAPIUploader(APIUploader):
+    def __init__(self, endpoint, username, password):
+        self.endpoint = endpoint
+        self.username = username
+        self.password = password
+
+    def upload_file(self, file_path):
+        # Upload to endpoint without certificate authentication
+        # Your implementation here
+        pass
+
+# Main application
+class MyApp:
+    def __init__(self, file_downloader, api_uploader):
+        self.file_downloader = file_downloader
+        self.api_uploader = api_uploader
+
+    def process_artifact(self, file_url):
+        downloaded_file_path = self.file_downloader.download_file(file_url)
+        extracted_file_path = self.file_downloader.extract_file(downloaded_file_path)
+        self.api_uploader.upload_file(extracted_file_path)
+
+# Usage
+file_downloader = TgzFileDownloader()
+api_uploader = CertAPIUploader(endpoint="https://api.example.com", cert_path="cert.pem", username="user", password="pass")
+app = MyApp(file_downloader, api_uploader)
+app.process_artifact('https://artifactory.example.com/file.tgz')
+Install Cookiecutter: pip install cookiecutter
+Create a directory for your template: mkdir my_template
+Navigate to the template directory: cd my_template
+Create the file structure mentioned above.
+Create the cookiecutter.json file and define the variables you want to prompt users for. For example:
+json
+Copy code
+{
+  "app_name": "my_app",
+  "api_url": "https://api.example.com",
+  "artifact_url": "https://artifactory.example.com/file.tgz"
+}
+
+
+
+import unittest
+from unittest.mock import patch, MagicMock
+import logging
+from io import StringIO
+import json
+from main import process_artifact
+
+class TestApp(unittest.TestCase):
+    def setUp(self):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        self.log_output = StringIO()
+        self.log_handler = logging.StreamHandler(self.log_output)
+        self.logger.addHandler(self.log_handler)
+
+    def tearDown(self):
+        self.log_output.close()
+        self.log_handler.close()
+        self.logger.removeHandler(self.log_handler)
+
+    @patch('api_uploader.APIUploader')
+    @patch('artifact_downloader.ArtifactoryDownloader')
+    def test_process_artifact_success(self, mock_downloader, mock_uploader):
+        # Mock successful artifact download and upload
+        mock_downloader_instance = MagicMock()
+        mock_downloader.return_value = mock_downloader_instance
+        mock_downloader_instance.download_and_extract_file.return_value = True
+
+        mock_uploader_instance = MagicMock()
+        mock_uploader.return_value = mock_uploader_instance
+        mock_uploader_instance.upload_file.return_value = True
+
+        # Run the process_artifact function
+        process_artifact(json_logging=True)
+
+        # Assert the log messages
+        log_output = self.log_output.getvalue().strip()
+        log_output_json = json.loads(log_output)
+
+        self.assertEqual(len(log_output_json), 4)  # Four log messages expected
+
+        # Verify the JSON log format
+        self.assertIn("levelname", log_output_json[0])
+        self.assertIn("asctime", log_output_json[0])
+        self.assertIn("message", log_output_json[0])
+
+        # Verify the log messages
+        self.assertEqual(log_output_json[0]["message"], "Downloading artifact...")
+        self.assertEqual(log_output_json[1]["message"], "Artifact downloaded and extracted successfully.")
+        self.assertEqual(log_output_json[2]["message"], "Uploading artifact...")
+        self.assertEqual(log_output_json[3]["message"], "Artifact uploaded to the API endpoint successfully.")
+
+    @patch('api_uploader.APIUploader')
+    @patch('artifact_downloader.ArtifactoryDownloader')
+    def test_process_artifact_failure(self, mock_downloader, mock_uploader):
+        # Mock failed artifact download
+        mock_downloader_instance = MagicMock()
+        mock_downloader.return_value = mock_downloader_instance
+        mock_downloader_instance.download_and_extract_file.return_value = False
+
+        # Run the process_artifact function
+        process_artifact(json_logging=True)
+
+        # Assert the log messages
+        log_output = self.log_output.getvalue().strip()
+        log_output_json = json.loads(log_output)
+
+        self.assertEqual(len(log_output_json), 2)  # Two log messages expected
+
+        # Verify the JSON log format
+        self.assertIn("levelname", log_output_json[0])
+        self.assertIn("asctime", log_output_json[0])
+        self.assertIn("message", log_output_json[0])
+
+        # Verify the log messages
+        self.assertEqual(log_output_json[0]["message"], "Downloading artifact...")
+        self.assertEqual(log_output_json[1]["message"], "Failed to download the artifact.")
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+requirements.txt file:
+
+makefile
+Copy code
+requests==2.26.0
+typer==0.4.0
+
+
+
+requirements-dev.txt file:
+
+makefile
+Copy code
+pytest==6.2.5
+flake8==4.0.1
+
+
+
+python app.py command to execute your Python application:
+
+Dockerfile
+Copy code
+# Use RHEL 8 as the base image
+FROM registry.access.redhat.com/ubi8/ubi:8.4
+
+# Set the working directory
+WORKDIR /app
+
+# Install Python and required dependencies
+RUN dnf -y module enable python39 && \
+    dnf -y install python39 && \
+    dnf clean all
+
+# Copy the application files
+COPY app.py /app/
+COPY api_uploader.py /app/
+COPY artifact_downloader.py /app/
+
+# Install dependencies
+COPY requirements.txt /app/
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Set the command to run the Python application
+CMD ["python", "app.py"]
+
+Here's the updated code for main.py, api_uploader.py, and artifact_downloader.py with logging and JSON logging options:
+
+main.py:
+
+python
+Copy code
+import os
+import typer
+import logging
+from artifact_downloader import ArtifactoryDownloader
+from api_uploader import APIUploader
+
+app = typer.Typer()
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format="[%(levelname)s] %(asctime)s %(message)s",
+                    datefmt="%Y-%m-%d %H:%M:%S")
+
+# Create a logger
+logger = logging.getLogger(__name__)
+
+@app.command()
+def process_artifact(json_logging: bool = False,
+                     artifactory_username: str = os.environ.get("ARTIFACTORY_USERNAME"),
+                     artifactory_password: str = os.environ.get("ARTIFACTORY_PASSWORD"),
+                     artifact_url: str = os.environ.get("ARTIFACT_URL"),
+                     output_dir: str = os.environ.get("OUTPUT_DIR"),
+                     api_username: str = os.environ.get("API_USERNAME"),
+                     api_password: str = os.environ.get("API_PASSWORD"),
+                     api_url: str = os.environ.get("API_URL")):
+    # Configure JSON logging if enabled
+    if json_logging:
+        logger.handlers = [logging.StreamHandler()]
+        logger.handlers[0].setFormatter(logging.Formatter("%(message)s"))
+        logger.setLevel(logging.INFO)
+
+    # Download the artifact
+    logger.info("Downloading artifact...")
+    downloader = ArtifactoryDownloader(artifactory_username, artifactory_password)
+    success = downloader.download_and_extract_file(artifact_url, output_dir)
+
+    if success:
+        logger.info("Artifact downloaded and extracted successfully.")
+    else:
+        logger.error("Failed to download the artifact.")
+
+    # Upload the artifact to the API endpoint
+    logger.info("Uploading artifact...")
+    uploader = APIUploader(api_url, api_username, api_password)
+    upload_success = uploader.upload_file(os.path.join(output_dir, "extracted_file.txt"))
+
+    if upload_success:
+        logger.info("Artifact uploaded to the API endpoint successfully.")
+    else:
+        logger.error("Failed to upload the artifact to the API endpoint.")
+
+if __name__ == "__main__":
+    app()
+api_uploader.py:
+
+python
+Copy code
+import requests
+import logging
+import json
+
+class APIUploader:
+    def __init__(self, api_url, username, password):
+        self.api_url = api_url
+        self.username = username
+        self.password = password
+        self.logger = logging.getLogger(__name__)
+
+    def upload_file(self, file_path):
+        self.logger.info("Uploading file to the API endpoint...")
+        with open(file_path, "rb") as file:
+            response = requests.post(self.api_url, auth=(self.username, self.password), files={"file": file})
+
+            if response.status_code == 200:
+                self.logger.info("File uploaded to the API endpoint successfully.")
+                return True
+            else:
+                self.logger.error("Failed to upload the file to the API endpoint.")
+                return False
+artifact_downloader.py:
+
+python
+Copy code
+import os
+import requests
+import tarfile
+import logging
+
+class ArtifactoryDownloader:
+    def __init__(self, username, password):
+        self.username = username
+        self.password = password
+        self.logger = logging.getLogger(__name__)
+
+    def download_and_extract_file(self, file_url, output_dir):
+        self.logger.info("Downloading file from Artifactory...")
+        response = requests.get(file_url, auth=(self.username, self.password), verify=False)
+
+        if response.status_code == 200:
+            file_path = os.path.join(output_dir, "downloaded_file.tgz")
+            with open(file_path
+
+
+
+
+---
+
 const fs = require('fs');
 const yaml = require('js-yaml');
 
