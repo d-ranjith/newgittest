@@ -1,3 +1,156 @@
+test_artifact_download.py
+
+import unittest
+from unittest.mock import patch, MagicMock
+import logging
+from io import StringIO
+import json
+from main import process_artifact
+
+class TestArtifactDownload(unittest.TestCase):
+    def setUp(self):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        self.log_output = StringIO()
+        self.log_handler = logging.StreamHandler(self.log_output)
+        self.logger.addHandler(self.log_handler)
+
+    def tearDown(self):
+        self.log_output.close()
+        self.log_handler.close()
+        self.logger.removeHandler(self.log_handler)
+
+    @patch('artifact_downloader.ArtifactoryDownloader')
+    def test_download_success(self, mock_downloader):
+        # Mock successful artifact download
+        mock_downloader_instance = MagicMock()
+        mock_downloader.return_value = mock_downloader_instance
+        mock_downloader_instance.download_and_extract_file.return_value = True
+
+        # Run the process_artifact function
+        process_artifact(json_logging=True)
+
+        # Assert the log messages
+        log_output = self.log_output.getvalue().strip()
+        log_output_json = json.loads(log_output)
+
+        self.assertEqual(len(log_output_json), 2)  # Two log messages expected
+
+        # Verify the JSON log format
+        self.assertIn("levelname", log_output_json[0])
+        self.assertIn("asctime", log_output_json[0])
+        self.assertIn("message", log_output_json[0])
+
+        # Verify the log messages
+        self.assertEqual(log_output_json[0]["message"], "Downloading artifact...")
+        self.assertEqual(log_output_json[1]["message"], "Artifact downloaded and extracted successfully.")
+
+    @patch('artifact_downloader.ArtifactoryDownloader')
+    def test_download_failure(self, mock_downloader):
+        # Mock failed artifact download
+        mock_downloader_instance = MagicMock()
+        mock_downloader.return_value = mock_downloader_instance
+        mock_downloader_instance.download_and_extract_file.return_value = False
+
+        # Run the process_artifact function
+        process_artifact(json_logging=True)
+
+        # Assert the log messages
+        log_output = self.log_output.getvalue().strip()
+        log_output_json = json.loads(log_output)
+
+        self.assertEqual(len(log_output_json), 2)  # Two log messages expected
+
+        # Verify the JSON log format
+        self.assertIn("levelname", log_output_json[0])
+        self.assertIn("asctime", log_output_json[0])
+        self.assertIn("message", log_output_json[0])
+
+        # Verify the log messages
+        self.assertEqual(log_output_json[0]["message"], "Downloading artifact...")
+        self.assertEqual(log_output_json[1]["message"], "Failed to download the artifact.")
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+test_api_uploader.py
+===================
+import unittest
+from unittest.mock import patch, MagicMock
+import logging
+from io import StringIO
+import json
+from main import process_artifact
+
+class TestAPIUploader(unittest.TestCase):
+    def setUp(self):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.INFO)
+        self.log_output = StringIO()
+        self.log_handler = logging.StreamHandler(self.log_output)
+        self.logger.addHandler(self.log_handler)
+
+    def tearDown(self):
+        self.log_output.close()
+        self.log_handler.close()
+        self.logger.removeHandler(self.log_handler)
+
+    @patch('api_uploader.APIUploader')
+    def test_upload_success(self, mock_uploader):
+        # Mock successful artifact upload
+        mock_uploader_instance = MagicMock()
+        mock_uploader.return_value = mock_uploader_instance
+        mock_uploader_instance.upload_file.return_value = True
+
+        # Run the process_artifact function
+        process_artifact(json_logging=True)
+
+        # Assert the log messages
+        log_output = self.log_output.getvalue().strip()
+        log_output_json = json.loads(log_output)
+
+        self.assertEqual(len(log_output_json), 2)  # Two log messages expected
+
+        # Verify the JSON log format
+        self.assertIn("levelname", log_output_json[0])
+        self.assertIn("asctime", log_output_json[0])
+        self.assertIn("message", log_output_json[0])
+
+        # Verify the log messages
+        self.assertEqual(log_output_json[0]["message"], "Uploading artifact...")
+        self.assertEqual(log_output_json[1]["message"], "Artifact uploaded to the API endpoint successfully.")
+
+    @patch('api_uploader.APIUploader')
+    def test_upload_failure(self, mock_uploader):
+        # Mock failed artifact upload
+        mock_uploader_instance = MagicMock()
+        mock_uploader.return_value = mock_uploader_instance
+        mock_uploader_instance.upload_file.return_value = False
+
+        # Run the process_artifact function
+        process_artifact(json_logging=True)
+
+        # Assert the log messages
+        log_output = self.log_output.getvalue().strip()
+        log_output_json = json.loads(log_output)
+
+        self.assertEqual(len(log_output_json), 2)  # Two log messages expected
+
+        # Verify the JSON log format
+        self.assertIn("levelname", log_output_json[0])
+        self.assertIn("asctime", log_output_json[0])
+        self.assertIn("message", log_output_json[0])
+
+        # Verify the log messages
+        self.assertEqual(log_output_json[0]["message"], "Uploading artifact...")
+        self.assertEqual(log_output_json[1]["message"], "Failed to upload the artifact.")
+
+if __name__ == '__main__':
+    unittest.main()
+
+
+
 import requests
 import zipfile
 import tarfile
