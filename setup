@@ -1,38 +1,64 @@
-import requests
+import unittest
+from unittest.mock import MagicMock
 
-# Set the flag or configuration setting to determine whether to use the mock implementation
-use_mock = True
+from artifact_downloader import ArtifactDownloader
+from api_uploader import ApiUploader, CertApiUploader, NonCertApiUploader
 
-if use_mock:
-    # Mock implementation
-    def publish_file(url, file_path):
-        # Perform some mock logic
-        response = {
-            "status_code": 200,
-            "message": "File published successfully"
-        }
-        return response
-else:
-    # Actual implementation
-    def publish_file(url, file_path):
-        # Make the actual API call using requests library
-        files = {"file": open(file_path, "rb")}
-        response = requests.post(url, files=files)
-        return response
 
-# Example usage
-api_url = "https://example.com/api/publish"
-file_path = "/path/to/file.txt"
+class TestArtifactDownloader(unittest.TestCase):
 
-# Call the API function
-api_response = publish_file(api_url, file_path)
+    def test_download_files(self):
+        # Create a mock logger
+        logger_mock = MagicMock()
 
-# Process the API response
-if api_response.status_code == 200:
-    # Process the successful response
-    data = api_response.json()
-    # Continue with the rest of your code
-else:
-    # Handle the error response
-    print(f"Error: API request failed with status code {api_response.status_code}")
-    # Handle the error appropriately
+        # Create an instance of ArtifactDownloader
+        downloader = ArtifactDownloader(logger_mock)
+
+        # Mock the requests.get() method to return a successful response
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        requests_mock = MagicMock()
+        requests_mock.get.return_value = mock_response
+
+        # Patch the requests module with the mock object
+        with unittest.mock.patch('artifact_downloader.requests', requests_mock):
+            # Call the download_files() method
+            downloader.download_files('output_dir')
+
+        # Assert that the logger was called with the expected log message
+        logger_mock.info.assert_called_with('Downloading files from Artifactory folder: ...')
+
+    # Add more test cases for other methods as needed
+
+
+class TestApiUploader(unittest.TestCase):
+
+    def test_cert_api_uploader_upload_file(self):
+        # Create a mock logger
+        logger_mock = MagicMock()
+
+        # Create an instance of CertApiUploader
+        uploader = CertApiUploader(logger_mock, 'username', 'password')
+
+        # Call the upload_file() method
+        uploader.upload_file()
+
+        # Assert that the logger was called with the expected log message
+        logger_mock.info.assert_called_with('Uploading file to API with certificate authentication...')
+    
+    def test_non_cert_api_uploader_upload_file(self):
+        # Create a mock logger
+        logger_mock = MagicMock()
+
+        # Create an instance of NonCertApiUploader
+        uploader = NonCertApiUploader(logger_mock, 'username', 'password')
+
+        # Call the upload_file() method
+        uploader.upload_file()
+
+        # Assert that the logger was called with the expected log message
+        logger_mock.info.assert_called_with('Uploading file to API without certificate authentication...')
+
+
+if __name__ == '__main__':
+    unittest.main()
