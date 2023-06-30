@@ -1,64 +1,114 @@
-import unittest
-from unittest.mock import MagicMock
+import requests
 
-from artifact_downloader import ArtifactDownloader
-from api_uploader import ApiUploader, CertApiUploader, NonCertApiUploader
+# Function to retrieve the JWT token
+def get_jwt_token():
+    # Replace with your code to obtain the JWT token
+    # This could involve authentication, authorization, or obtaining the token from a secure storage
+    jwt_token = 'YOUR_JWT_TOKEN'
+    return jwt_token
 
+# Function to send the JWT token to the API with a payload
+def send_request_with_token(jwt_token):
+    url = 'https://your-api-url.com'  # Replace with the API endpoint URL
+    payload = {
+        'key1': 'value1',  # Replace with your payload data
+        'key2': 'value2'
+    }
+    headers = {
+        'Authorization': f'Bearer {jwt_token}',
+        'Content-Type': 'application/json'
+    }
 
-class TestArtifactDownloader(unittest.TestCase):
+    try:
+        response = requests.post(url, json=payload, headers=headers)
 
-    def test_download_files(self):
-        # Create a mock logger
-        logger_mock = MagicMock()
+        if response.status_code == 200:
+            # Successful response
+            print('API response:', response.json())
+        else:
+            # Error response
+            print('Request failed with status code:', response.status_code)
 
-        # Create an instance of ArtifactDownloader
-        downloader = ArtifactDownloader(logger_mock)
+    except requests.exceptions.RequestException as e:
+        print('Error:', e)
 
-        # Mock the requests.get() method to return a successful response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        requests_mock = MagicMock()
-        requests_mock.get.return_value = mock_response
-
-        # Patch the requests module with the mock object
-        with unittest.mock.patch('artifact_downloader.requests', requests_mock):
-            # Call the download_files() method
-            downloader.download_files('output_dir')
-
-        # Assert that the logger was called with the expected log message
-        logger_mock.info.assert_called_with('Downloading files from Artifactory folder: ...')
-
-    # Add more test cases for other methods as needed
-
-
-class TestApiUploader(unittest.TestCase):
-
-    def test_cert_api_uploader_upload_file(self):
-        # Create a mock logger
-        logger_mock = MagicMock()
-
-        # Create an instance of CertApiUploader
-        uploader = CertApiUploader(logger_mock, 'username', 'password')
-
-        # Call the upload_file() method
-        uploader.upload_file()
-
-        # Assert that the logger was called with the expected log message
-        logger_mock.info.assert_called_with('Uploading file to API with certificate authentication...')
-    
-    def test_non_cert_api_uploader_upload_file(self):
-        # Create a mock logger
-        logger_mock = MagicMock()
-
-        # Create an instance of NonCertApiUploader
-        uploader = NonCertApiUploader(logger_mock, 'username', 'password')
-
-        # Call the upload_file() method
-        uploader.upload_file()
-
-        # Assert that the logger was called with the expected log message
-        logger_mock.info.assert_called_with('Uploading file to API without certificate authentication...')
+# Main execution
+jwt_token = get_jwt_token()  # Retrieve the JWT token
+send_request_with_token(jwt_token)  # Send the request with the JWT token and payload
 
 
-if __name__ == '__main__':
-    unittest.main()
+-----
+
+const https = require('https');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
+const jwksClient = require('jwks-rsa');
+
+const options = {
+  key: fs.readFileSync('server.key'),
+  cert: fs.readFileSync('server.crt'),
+  ca: fs.readFileSync('ca.crt'),
+  requestCert: true,
+  rejectUnauthorized: true,
+};
+
+const server = https.createServer(options, (req, res) => {
+  try {
+    // Check if client certificate is provided and valid
+    if (!req.client.authorized) {
+      res.statusCode = 401;
+      res.end('Client certificate authentication failed.');
+      return;
+    }
+
+    // Verify and decode the access token
+    const accessToken = req.headers.authorization.split(' ')[1];
+    const clientID = 'YOUR_CLIENT_ID'; // OAuth client ID
+    const jwksUri = 'https://your-oauth-provider/.well-known/jwks.json';
+
+    const client = jwksClient({
+      jwksUri: jwksUri,
+    });
+
+    const verifyOptions = {
+      audience: clientID,
+      issuer: 'https://your-oauth-provider/',
+      algorithms: ['RS256'],
+    };
+
+    jwt.verify(accessToken, getKey, verifyOptions, (err, decoded) => {
+      if (err) {
+        res.statusCode = 401;
+        res.end('Invalid access token.');
+        return;
+      }
+
+      // Check if required headers are present
+      if (!req.headers['x-custom-header']) {
+        res.statusCode = 400;
+        res.end('Missing custom header.');
+        return;
+      }
+
+      // Access token is valid and required headers are present
+      // Perform your API logic here
+
+      res.statusCode = 200;
+      res.end('API response');
+    });
+  } catch (err) {
+    res.statusCode = 500;
+    res.end('Internal server error.');
+  }
+});
+
+function getKey(header, callback) {
+  client.getSigningKey(header.kid, (err, key) => {
+    const signingKey = key.publicKey || key.rsaPublicKey;
+    callback(null, signingKey);
+  });
+}
+
+server.listen(3000, () => {
+  console.log('Server running on https://localhost:3000');
+});
