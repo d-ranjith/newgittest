@@ -1,114 +1,67 @@
+import os
 import requests
 
-# Function to retrieve the JWT token
-def get_jwt_token():
-    # Replace with your code to obtain the JWT token
-    # This could involve authentication, authorization, or obtaining the token from a secure storage
-    jwt_token = 'YOUR_JWT_TOKEN'
-    return jwt_token
+class OAuthValidator:
+    def __init__(self, credentials_file):
+        self.credentials_file = credentials_file
 
-# Function to send the JWT token to the API with a payload
-def send_request_with_token(jwt_token):
-    url = 'https://your-api-url.com'  # Replace with the API endpoint URL
-    payload = {
-        'key1': 'value1',  # Replace with your payload data
-        'key2': 'value2'
-    }
-    headers = {
-        'Authorization': f'Bearer {jwt_token}',
-        'Content-Type': 'application/json'
-    }
+    def get_jwt_token(self):
+        try:
+            # Read client_id and secret from the credentials file
+            with open(self.credentials_file, 'r') as file:
+                lines = file.readlines()
+                client_id = None
+                client_secret = None
+                for line in lines:
+                    if line.startswith('client_id='):
+                        client_id = line.split('=')[1].strip()
+                    elif line.startswith('client_secret='):
+                        client_secret = line.split('=')[1].strip()
 
-    try:
-        response = requests.post(url, json=payload, headers=headers)
+            if client_id is None or client_secret is None:
+                print("Error: Invalid format in credentials file.")
+                return None
 
-        if response.status_code == 200:
-            # Successful response
-            print('API response:', response.json())
-        else:
-            # Error response
-            print('Request failed with status code:', response.status_code)
+            # Connect to API endpoint to retrieve JWT token
+            response = requests.post('https://api.example.com/token', data={'client_id': client_id, 'secret': client_secret})
+            response.raise_for_status()  # Raise an exception if the request was not successful
 
-    except requests.exceptions.RequestException as e:
-        print('Error:', e)
+            # Extract and return the JWT token
+            token = response.json().get('token')
+            return token
 
-# Main execution
-jwt_token = get_jwt_token()  # Retrieve the JWT token
-send_request_with_token(jwt_token)  # Send the request with the JWT token and payload
+        except FileNotFoundError:
+            print("Error: Credentials file not found.")
+            return None
+        except requests.exceptions.RequestException as e:
+            print(f"Error connecting to API endpoint: {e}")
+            return None
+        except KeyError:
+            print("Error: Invalid response from API endpoint.")
+            return None
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+
+    def validate_token(self, token):
+        try:
+            # Connect to API service to validate the token
+            headers = {'Authorization': f'Bearer {token}'}
+            response = requests.get('https://api.example.com/validate', headers=headers)
+            response.raise_for_status()  # Raise an exception if the request was not successful
+
+            # Process the response if needed
+            # ...
+
+        except requests.exceptions.RequestException as e:
+            print(f"Error connecting to API service: {e}")
+        except Exception as e:
+            print(f"Error: {e}")
 
 
------
-
-const https = require('https');
-const fs = require('fs');
-const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');
-
-const options = {
-  key: fs.readFileSync('server.key'),
-  cert: fs.readFileSync('server.crt'),
-  ca: fs.readFileSync('ca.crt'),
-  requestCert: true,
-  rejectUnauthorized: true,
-};
-
-const server = https.createServer(options, (req, res) => {
-  try {
-    // Check if client certificate is provided and valid
-    if (!req.client.authorized) {
-      res.statusCode = 401;
-      res.end('Client certificate authentication failed.');
-      return;
-    }
-
-    // Verify and decode the access token
-    const accessToken = req.headers.authorization.split(' ')[1];
-    const clientID = 'YOUR_CLIENT_ID'; // OAuth client ID
-    const jwksUri = 'https://your-oauth-provider/.well-known/jwks.json';
-
-    const client = jwksClient({
-      jwksUri: jwksUri,
-    });
-
-    const verifyOptions = {
-      audience: clientID,
-      issuer: 'https://your-oauth-provider/',
-      algorithms: ['RS256'],
-    };
-
-    jwt.verify(accessToken, getKey, verifyOptions, (err, decoded) => {
-      if (err) {
-        res.statusCode = 401;
-        res.end('Invalid access token.');
-        return;
-      }
-
-      // Check if required headers are present
-      if (!req.headers['x-custom-header']) {
-        res.statusCode = 400;
-        res.end('Missing custom header.');
-        return;
-      }
-
-      // Access token is valid and required headers are present
-      // Perform your API logic here
-
-      res.statusCode = 200;
-      res.end('API response');
-    });
-  } catch (err) {
-    res.statusCode = 500;
-    res.end('Internal server error.');
-  }
-});
-
-function getKey(header, callback) {
-  client.getSigningKey(header.kid, (err, key) => {
-    const signingKey = key.publicKey || key.rsaPublicKey;
-    callback(null, signingKey);
-  });
-}
-
-server.listen(3000, () => {
-  console.log('Server running on https://localhost:3000');
-});
+# Example usage
+credentials_file = '/path/to/credentials.txt'  # Replace with the actual path to your credentials file
+validator = OAuthValidator(credentials_file)
+jwt_token = validator.get_jwt_token()
+if jwt_token:
+    validator.validate_token(jwt_token)
