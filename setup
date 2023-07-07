@@ -1,65 +1,77 @@
-const fs = require('fs');
-const request = require('request');
-const jwt = require('jsonwebtoken');
+your-app/
+  |- src/
+  |   |- config/
+  |   |    |- logger.js
+  |   |    |- schema.js
+  |   |
+  |   |- controllers/
+  |   |    |- FileController.js
+  |   |    |- OAuthController.js
+  |   |    |- ServiceController.js
+  |   |
+  |   |- models/
+  |   |    |- Service.js
+  |   |
+  |   |- utils/
+  |   |    |- FileHandler.js
+  |   |    |- Logger.js
+  |   |
+  |   |- app.js
+  |
+  |- tests/
+  |   |- FileController.test.js
+  |   |- OAuthController.test.js
+  |   |- ServiceController.test.js
+  |
+  |- .env
+  |- Dockerfile
+  |- package.json
+  |- README.md
+
+Here are the contents of the code files based on the provided folder structure:
+
+logger.js (src/config/logger.js):
+javascript
+Copy code
+const { createLogger, format, transports } = require('winston');
+const { combine, timestamp, printf } = format;
+
+const logFormat = printf(({ level, message, timestamp }) => {
+  return `${timestamp} [${level.toUpperCase()}] - ${message}`;
+});
+
+const logger = createLogger({
+  format: combine(timestamp(), logFormat),
+  transports: [new transports.Console()],
+});
+
+module.exports = logger;
+schema.js (src/config/schema.js):
+javascript
+Copy code
 const Joi = require('joi');
-const dotenv = require('dotenv');
-const { promisify } = require('util');
-const extractTarGz = promisify(require('tar').x);
-const extractZip = promisify(require('unzipper').Extract);
-const request = require('request-promise-native');
 
-dotenv.config(); // Load environment variables from .env file during development
+const schema = Joi.object({
+  CREDENTIALS_FILE_PATH: Joi.string().required(),
+  ARCHIVE_TYPE: Joi.string().valid('tar.gz', 'zip').required(),
+  ARTIFACTORY_URL: Joi.string().uri().required(),
+  API_ENDPOINT: Joi.string().uri().required(),
+  DEBUG: Joi.string().valid('true', 'false').required(),
+});
 
-const DEBUG = process.env.DEBUG === 'true';
-const LOG_LEVELS = {
-  error: 0,
-  log: 1,
-  debug: 2,
-};
-const LOG_VERBOSITY = parseInt(process.env.LOG_VERBOSITY) || LOG_LEVELS.log;
+module.exports = schema;
+FileController.js (src/controllers/FileController.js):
+javascript
+Copy code
+const fs = require('fs');
+const Logger = require('../config/logger');
 
-// Logger class for logging messages
-class Logger {
-  static log(module, message) {
-    if (LOG_LEVELS.log <= LOG_VERBOSITY) {
-      const timestamp = new Date().toISOString();
-      console.log(JSON.stringify({ timestamp, module, level: 'log', message }));
-    }
-  }
-
-  static error(module, message) {
-    if (LOG_LEVELS.error <= LOG_VERBOSITY) {
-      const timestamp = new Date().toISOString();
-      console.error(JSON.stringify({ timestamp, module, level: 'error', message }));
-    }
-  }
-
-  static debug(module, message) {
-    if (LOG_LEVELS.debug <= LOG_VERBOSITY) {
-      const timestamp = new Date().toISOString();
-      console.log(JSON.stringify({ timestamp, module, level: 'debug', message }));
-    }
-  }
-}
-
-// SchemaValidator class for validating input using Joi
-class SchemaValidator {
-  static validate(input, schema) {
-    const { error, value } = schema.validate(input);
-    if (error) {
-      throw new Error(`Validation error: ${error.message}`);
-    }
-    return value;
-  }
-}
-
-// FileHandler class for reading client_id and client_secret from a file
-class FileHandler {
+class FileController {
   static readCredentialsFromFile(filePath) {
     try {
       const fileData = fs.readFileSync(filePath, 'utf8');
       const { client_id, client_secret } = JSON.parse(fileData);
-      Logger.debug(`Credentials: ${DEBUG ? JSON.stringify({ client_id, client_secret }) : '********'}`);
+      Logger.debug(`Credentials: ${process.env.DEBUG ? JSON.stringify({ client_id, client_secret }) : '********'}`);
       return { client_id, client_secret };
     } catch (error) {
       Logger.error(`Error reading credentials from file: ${error.message}`);
@@ -68,44 +80,31 @@ class FileHandler {
   }
 }
 
-// ArchiveExtractor class for extracting different archive types
-class ArchiveExtractor {
-  static async extractTarGz(source, destination) {
-    await extractTarGz({ file: source, cwd: destination });
-    Logger.log('Tar.gz file extracted successfully');
-  }
+module.exports = FileController;
+OAuthController.js (src/controllers/OAuthController.js):
+javascript
+Copy code
+const jwt = require('jsonwebtoken');
+const Logger = require('../config/logger');
 
-  static async extractZip(source, destination) {
-    await extractZip(source).extract({ path: destination });
-    Logger.log('Zip file extracted successfully');
-  }
-}
-
-// OAuthValidator class for fetching and validating OAuth JWT token
-class OAuthValidator {
+class OAuthController {
   constructor(client_id, client_secret) {
     this.client_id = client_id;
     this.client_secret = client_secret;
   }
 
   fetchToken() {
-    // Implement OAuth token fetching logic here using client_id and client_secret
-    // Return a Promise that resolves with the token
-    // Example implementation using a dummy token for demonstration purposes:
     return new Promise((resolve) => {
       setTimeout(() => {
         const dummyToken = jwt.sign({ username: 'example_user' }, 'dummy_secret');
         Logger.log('Token fetched successfully');
-        Logger.debug(`Token: ${DEBUG ? dummyToken : '********'}`);
+        Logger.debug(`Token: ${process.env.DEBUG ? dummyToken : '********'}`);
         resolve(dummyToken);
       }, 2000);
     });
   }
 
   validateToken(token) {
-    // Implement token validation logic here
-    // Return a Promise that resolves with true if the token is valid, or false if it is invalid
-    // Example implementation using a dummy token for demonstration purposes:
     return new Promise((resolve) => {
       setTimeout(() => {
         try {
@@ -121,8 +120,15 @@ class OAuthValidator {
   }
 }
 
-// ServiceUploader class for uploading a service to an API endpoint
-class ServiceUploader {
+module.exports = OAuthController;
+ServiceController.js (src/controllers/ServiceController.js):
+javascript
+Copy code
+const fs = require('fs');
+const request = require('request-promise-native');
+const Logger = require('../config/logger');
+
+class ServiceController {
   static async uploadService(serviceData, endpoint) {
     try {
       const options = {
@@ -132,8 +138,8 @@ class ServiceUploader {
           'Content-Type': 'application/json',
         },
         body: serviceData,
-        resolveWithFullResponse: true, // Return the full response object
-        json: true, // Automatically parse response body as JSON
+        resolveWithFullResponse: true,
+        json: true,
       };
 
       const response = await request(options);
@@ -148,7 +154,62 @@ class ServiceUploader {
   }
 }
 
-// Application class to orchestrate the download, authentication, and upload process
+module.exports = ServiceController;
+
+Here are the remaining code files based on the provided folder structure:
+
+Service.js (src/models/Service.js):
+javascript
+Copy code
+class Service {
+  static async extractTarGz(source, destination) {
+    // Implementation for extracting tar.gz archives
+  }
+
+  static async extractZip(source, destination) {
+    // Implementation for extracting zip archives
+  }
+}
+
+module.exports = Service;
+FileHandler.js (src/utils/FileHandler.js):
+javascript
+Copy code
+const fs = require('fs');
+const Logger = require('../config/logger');
+
+class FileHandler {
+  static readCredentialsFromFile(filePath) {
+    try {
+      const fileData = fs.readFileSync(filePath, 'utf8');
+      const { client_id, client_secret } = JSON.parse(fileData);
+      Logger.debug(`Credentials: ${process.env.DEBUG ? JSON.stringify({ client_id, client_secret }) : '********'}`);
+      return { client_id, client_secret };
+    } catch (error) {
+      Logger.error(`Error reading credentials from file: ${error.message}`);
+      return null;
+    }
+  }
+}
+
+module.exports = FileHandler;
+app.js (src/app.js):
+javascript
+Copy code
+const fs = require('fs');
+const request = require('request');
+const jwt = require('jsonwebtoken');
+const dotenv = require('dotenv');
+const { promisify } = require('util');
+const { extractTarGz, extractZip } = require('./models/Service');
+const FileHandler = require('./utils/FileHandler');
+const Logger = require('./config/logger');
+const SchemaValidator = require('./config/schema');
+const { uploadService } = require('./controllers/ServiceController');
+const { fetchToken, validateToken } = require('./controllers/OAuthController');
+
+dotenv.config();
+
 class Application {
   constructor(credentialsFilePath, archiveType, artifactoryURL, apiEndpoint) {
     this.credentialsFilePath = credentialsFilePath;
@@ -166,12 +227,11 @@ class Application {
 
     try {
       await this.downloadFile(this.artifactoryURL, 'downloaded_file');
-      const oauthValidator = new OAuthValidator(client_id, client_secret);
-      const token = await oauthValidator.fetchToken();
-      const isValidToken = await oauthValidator.validateToken(token);
+      const token = await fetchToken(client_id, client_secret);
+      const isValidToken = await validateToken(token);
       if (isValidToken) {
-        const serviceData = fs.readFileSync('service_data.json', 'utf8'); // Replace with your service data file
-        const uploadResponse = await ServiceUploader.uploadService(serviceData, this.apiEndpoint);
+        const serviceData = fs.readFileSync('service_data.json', 'utf8');
+        const uploadResponse = await uploadService(serviceData, this.apiEndpoint);
         Logger.log(`Upload Response: ${JSON.stringify(uploadResponse)}`);
       } else {
         Logger.error('Invalid token');
@@ -186,7 +246,7 @@ class Application {
       const fileStream = fs.createWriteStream(`${destination}.${this.archiveType}`);
       request(url)
         .on('response', (response) => {
-          Logger.debug(`Download File Size: ${DEBUG ? response.headers['content-length'] : '********'}`);
+          Logger.debug(`Download File Size: ${process.env.DEBUG ? response.headers['content-length'] : '********'}`);
         })
         .pipe(fileStream)
         .on('finish', async () => {
@@ -204,10 +264,10 @@ class Application {
   async extractFile(source, destination) {
     switch (this.archiveType) {
       case 'tar.gz':
-        await ArchiveExtractor.extractTarGz(source, destination);
+        await Service.extractTarGz(source, destination);
         break;
       case 'zip':
-        await ArchiveExtractor.extractZip(source, destination);
+        await Service.extractZip(source, destination);
         break;
       default:
         Logger.error(`Unsupported archive type: ${this.archiveType}`);
@@ -216,19 +276,8 @@ class Application {
   }
 }
 
-// Define schema for validating input
-const schema = Joi.object({
-  CREDENTIALS_FILE_PATH: Joi.string().required(),
-  ARCHIVE_TYPE: Joi.string().valid('tar.gz', 'zip').required(),
-  ARTIFACTORY_URL: Joi.string().uri().required(),
-  API_ENDPOINT: Joi.string().uri().required(),
-  DEBUG: Joi.string().valid('true', 'false').required(),
-});
+const envVars = SchemaValidator.validate(process.env);
 
-// Validate environment variables against the schema
-const envVars = SchemaValidator.validate(process.env, schema);
-
-// Create and run the application
 const app = new Application(
   envVars.CREDENTIALS_FILE_PATH,
   envVars.ARCHIVE_TYPE,
@@ -238,180 +287,281 @@ const app = new Application(
 app.run();
 
 
-========= unit
 
-// Import necessary dependencies and modules
+---- unit tests
+FileController.test.js (tests/FileController.test.js):
 
-// Mock the Logger class
-jest.mock('./Logger');
+const fs = require('fs');
+const FileController = require('../src/controllers/FileController');
 
-// Import the modules to test
-const { Application, FileHandler, OAuthValidator, ServiceUploader } = require('./your-modules');
+describe('FileController', () => {
+  describe('readCredentialsFromFile', () => {
+    it('should read credentials from file and return an object', () => {
+      // Set up
+      const filePath = 'test/credentials.json';
+      const expectedCredentials = {
+        client_id: 'your-client-id',
+        client_secret: 'your-client-secret',
+      };
 
-// Create a test suite for the Application class
-describe('Application', () => {
-  // Create a test case for the run method
-  describe('run', () => {
-    // Create a test case for valid credentials
-    test('should run successfully with valid credentials', async () => {
-      // Mock the necessary dependencies and setup necessary variables
-      const mockCredentials = { client_id: 'valid_client_id', client_secret: 'valid_client_secret' };
-      FileHandler.readCredentialsFromFile.mockReturnValue(mockCredentials);
-      const mockToken = 'valid_token';
-      OAuthValidator.prototype.fetchToken.mockResolvedValue(mockToken);
-      OAuthValidator.prototype.validateToken.mockResolvedValue(true);
-      const mockServiceData = 'mock_service_data';
-      fs.readFileSync.mockReturnValue(mockServiceData);
-      const mockUploadResponse = { statusCode: 200 };
-      ServiceUploader.uploadService.mockResolvedValue(mockUploadResponse);
+      // Mock the fs.readFileSync method
+      jest.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(expectedCredentials));
 
-      // Create an instance of the Application class with mock inputs
-      const app = new Application('valid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
+      // Call the method being tested
+      const credentials = FileController.readCredentialsFromFile(filePath);
 
-      // Run the application
-      await app.run();
+      // Assertions
+      expect(credentials).toEqual(expectedCredentials);
 
-      // Verify that the necessary methods are called with the expected arguments
-      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('valid_credentials_file_path');
-      expect(OAuthValidator.prototype.fetchToken).toHaveBeenCalled();
-      expect(OAuthValidator.prototype.validateToken).toHaveBeenCalledWith(mockToken);
-      expect(fs.readFileSync).toHaveBeenCalledWith('service_data.json', 'utf8');
-      expect(ServiceUploader.uploadService).toHaveBeenCalledWith(mockServiceData, 'valid_api_endpoint');
-
-      // Verify that the necessary log messages are called
-      expect(Logger.log).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Token fetched successfully'));
-      expect(Logger.log).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Upload Response'));
-
-      // Verify the successful completion of the application
-      expect(Logger.error).not.toHaveBeenCalled();
+      // Restore the original method
+      fs.readFileSync.mockRestore();
     });
 
-    // Create a test case for invalid credentials
-    test('should log an error with invalid credentials', async () => {
-      // Mock the necessary dependencies and setup necessary variables
-      FileHandler.readCredentialsFromFile.mockReturnValue(null);
+    it('should handle errors when reading credentials from file', () => {
+      // Set up
+      const filePath = 'test/non-existent-file.json';
 
-      // Create an instance of the Application class with mock inputs
-      const app = new Application('invalid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
-
-      // Run the application
-      await app.run();
-
-      // Verify that the necessary methods are called with the expected arguments
-      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('invalid_credentials_file_path');
-
-      // Verify that the necessary log messages are called
-      expect(Logger.error).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Invalid credentials'));
-      expect(Logger.log).not.toHaveBeenCalled();
-    });
-
-    // Create a test case for invalid token
-    test('should log an error with invalid token', async () => {
-      // Mock the necessary dependencies and setup necessary variables
-      const mockCredentials = { client_id: 'valid_client_id', client_secret: 'valid_client_secret' };
-      FileHandler.readCredentialsFromFile.mockReturnValue(mockCredentials);
-      const mockToken = 'valid_token';
-      OAuthValidator.prototype.fetchToken.mockResolvedValue(mockToken);
-      OAuthValidator.prototype.validateToken.mockResolvedValue(false);
-
-      // Create an instance of the Application class with mock inputs
-      const app = new Application('valid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
-
-      // Run the application
-      await app.run();
-
-      // Verify that the necessary methods are called with the expected arguments
-      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('valid_credentials_file_path');
-      expect(OAuthValidator.prototype.fetchToken).toHaveBeenCalled();
-      expect(OAuthValidator.prototype.validateToken).toHaveBeenCalledWith(mockToken);
-
-      // Verify that the necessary log messages are called
-      expect(Logger.error).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Invalid token'));
-      expect(Logger.log).not.toHaveBeenCalled();
-    });
-
-    // Create a test case for an error during application execution
-    test('should log an error with application execution error', async () => {
-      // Mock the necessary dependencies and setup necessary variables
-      const mockCredentials = { client_id: 'valid_client_id', client_secret: 'valid_client_secret' };
-      FileHandler.readCredentialsFromFile.mockReturnValue(mockCredentials);
-      const mockToken = 'valid_token';
-      OAuthValidator.prototype.fetchToken.mockResolvedValue(mockToken);
-      OAuthValidator.prototype.validateToken.mockResolvedValue(true);
-      const mockError = new Error('Application error');
-      fs.readFileSync.mockImplementation(() => {
-        throw mockError;
+      // Mock the fs.readFileSync method to throw an error
+      jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
+        throw new Error('File not found');
       });
 
-      // Create an instance of the Application class with mock inputs
-      const app = new Application('valid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
+      // Call the method being tested
+      const credentials = FileController.readCredentialsFromFile(filePath);
 
-      // Run the application
-      await app.run();
+      // Assertions
+      expect(credentials).toBeNull();
 
-      // Verify that the necessary methods are called with the expected arguments
-      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('valid_credentials_file_path');
-      expect(OAuthValidator.prototype.fetchToken).toHaveBeenCalled();
-      expect(OAuthValidator.prototype.validateToken).toHaveBeenCalledWith(mockToken);
-      expect(fs.readFileSync).toHaveBeenCalledWith('service_data.json', 'utf8');
-
-      // Verify that the necessary log messages are called
-      expect(Logger.error).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Error running the application'));
-      expect(Logger.log).not.toHaveBeenCalled();
+      // Restore the original method
+      fs.readFileSync.mockRestore();
     });
   });
 });
 
 
----------- package.json
+Copy code
+// Unit tests for FileController.js
+const jwt = require('jsonwebtoken');
+const OAuthController = require('../src/controllers/OAuthController');
 
-{
-  "name": "your-app",
-  "version": "1.0.0",
-  "description": "Your Node.js application description",
-  "main": "app.js",
-  "scripts": {
-    "start": "node app.js",
-    "test": "mocha"
-  },
-  "author": "Your Name",
-  "license": "MIT",
-  "dependencies": {
-    "express": "^4.17.1",
-    "joi": "^17.4.0",
-    "dotenv": "^10.0.0",
-    "request-promise-native": "^1.0.9",
-    "jsonwebtoken": "^8.5.1",
-    "tar": "^6.1.0",
-    "unzipper": "^0.10.11"
-  },
-  "devDependencies": {
-    "mocha": "^9.1.1",
-    "chai": "^4.3.4",
-    "sinon": "^11.1.1"
-  }
-}
+jest.mock('jsonwebtoken');
+
+describe('OAuthController', () => {
+  describe('fetchToken', () => {
+    it('should fetch a token successfully', async () => {
+      // Set up
+      const expectedToken = 'your-token';
+      const client_id = 'your-client-id';
+      const client_secret = 'your-client-secret';
+
+      // Mock the jwt.sign method
+      jwt.sign.mockReturnValue(expectedToken);
+
+      // Create an instance of the OAuthController
+      const oauthController = new OAuthController(client_id, client_secret);
+
+      // Call the method being tested
+      const token = await oauthController.fetchToken();
+
+      // Assertions
+      expect(token).toBe(expectedToken);
+
+      // Verify that jwt.sign was called with the correct arguments
+      expect(jwt.sign).toHaveBeenCalledWith({ username: 'example_user' }, client_secret);
+
+      // Restore the original method
+      jwt.sign.mockRestore();
+    });
+  });
+
+  describe('validateToken', () => {
+    it('should validate a valid token', async () => {
+      // Set up
+      const token = 'valid-token';
+      const client_id = 'your-client-id';
+      const client_secret = 'your-client-secret';
+
+      // Mock the jwt.verify method
+      jwt.verify.mockReturnValue(true);
+
+      // Create an instance of the OAuthController
+      const oauthController = new OAuthController(client_id, client_secret);
+
+      // Call the method being tested
+      const isValidToken = await oauthController.validateToken(token);
+
+      // Assertions
+      expect(isValidToken).toBe(true);
+
+      // Verify that jwt.verify was called with the correct arguments
+      expect(jwt.verify).toHaveBeenCalledWith(token, client_secret);
+
+      // Restore the original method
+      jwt.verify.mockRestore();
+    });
+
+    it('should handle an invalid token', async () => {
+      // Set up
+      const token = 'invalid-token';
+      const client_id = 'your-client-id';
+      const client_secret = 'your-client-secret';
+
+      // Mock the jwt.verify method to throw an error
+      jwt.verify.mockImplementation(() => {
+        throw new Error('Invalid token');
+      });
+
+      // Create an instance of the OAuthController
+      const oauthController = new OAuthController(client_id, client_secret);
+
+      // Call the method being tested
+      const isValidToken = await oauthController.validateToken(token);
+
+      // Assertions
+      expect(isValidToken).toBe(false);
+
+      // Verify that jwt.verify was called with the correct arguments
+      expect(jwt.verify).toHaveBeenCalledWith(token, client_secret);
+
+      // Restore the original method
+      jwt.verify.mockRestore();
+    });
+  });
+});
 
 
--------- dockerfile
+
+javascript
+
+ServiceController.test.js (tests/ServiceController.test.js):
+
+
+const ServiceController = require('../src/controllers/ServiceController');
+const Service = require('../src/models/Service');
+
+jest.mock('../src/models/Service');
+
+describe('ServiceController', () => {
+  describe('uploadService', () => {
+    it('should upload a service successfully', async () => {
+      // Set up
+      const serviceData = 'your-service-data';
+      const endpoint = 'your-api-endpoint';
+      const statusCode = 200;
+
+      // Mock the Service model's static method
+      Service.uploadService.mockResolvedValue(statusCode);
+
+      // Create an instance of the ServiceController
+      const serviceController = new ServiceController();
+
+      // Call the method being tested
+      const response = await serviceController.uploadService(serviceData, endpoint);
+
+      // Assertions
+      expect(response).toBe(statusCode);
+
+      // Verify that Service.uploadService was called with the correct arguments
+      expect(Service.uploadService).toHaveBeenCalledWith(serviceData, endpoint);
+
+      // Restore the original method
+      Service.uploadService.mockRestore();
+    });
+
+    it('should handle a service upload error', async () => {
+      // Set up
+      const serviceData = 'your-service-data';
+      const endpoint = 'your-api-endpoint';
+      const errorMessage = 'Service upload failed';
+
+      // Mock the Service model's static method to throw an error
+      Service.uploadService.mockRejectedValue(new Error(errorMessage));
+
+      // Create an instance of the ServiceController
+      const serviceController = new ServiceController();
+
+      // Call the method being tested
+      try {
+        await serviceController.uploadService(serviceData, endpoint);
+      } catch (error) {
+        // Assertion
+        expect(error.message).toBe(errorMessage);
+      }
+
+      // Verify that Service.uploadService was called with the correct arguments
+      expect(Service.uploadService).toHaveBeenCalledWith(serviceData, endpoint);
+
+      // Restore the original method
+      Service.uploadService.mockRestore();
+    });
+  });
+});
+
+
+==== dockerfile
 
 # Use an official Node.js runtime as the base image
-FROM node:14-alpine
+FROM node:14
 
 # Set the working directory in the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json to the working directory
-COPY package*.json ./
+# Copy the package.json and package-lock.json files to the container
+COPY package.json package-lock.json ./
 
 # Install the application dependencies
 RUN npm install --production
 
-# Copy the application source code to the working directory
-COPY . .
+# Copy the application source code to the container
+COPY src ./src
+COPY tests ./tests
 
-# Expose the port that the application listens on (if applicable)
-EXPOSE 3000
+# Expose a port for the application (if needed)
+# EXPOSE 3000
 
-# Set the command to run your Node.js application
-CMD [ "node", "app.js" ]
+# Set the environment variables (if needed)
+# ENV NODE_ENV=production
+
+# Run the command to start the application
+CMD ["npm", "start"]
+
+
+--- package.json
+
+{
+  "name": "your-app",
+  "version": "1.0.0",
+  "description": "Your application description",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.17.1",
+    "joi": "^17.4.2",
+    "jsonwebtoken": "^8.5.1",
+    "request": "^2.88.2",
+    "request-promise-native": "^1.0.9",
+    "tar": "^6.1.0",
+    "unzipper": "^0.10.11"
+  },
+  "devDependencies": {
+    "jest": "^27.0.6",
+    "supertest": "^6.1.6"
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
