@@ -1,35 +1,417 @@
-import os
+const fs = require('fs');
+const request = require('request');
+const jwt = require('jsonwebtoken');
+const Joi = require('joi');
+const dotenv = require('dotenv');
+const { promisify } = require('util');
+const extractTarGz = promisify(require('tar').x);
+const extractZip = promisify(require('unzipper').Extract);
+const request = require('request-promise-native');
 
-credentials_file = '/path/to/credentials.txt'
+dotenv.config(); // Load environment variables from .env file during development
 
-# Check if the credentials file exists
-if not os.path.isfile(credentials_file):
-    print("Error: Credentials file not found.")
-    print("Please make sure the credentials file is present at the specified location.")
-    exit(1)
+const DEBUG = process.env.DEBUG === 'true';
+const LOG_LEVELS = {
+  error: 0,
+  log: 1,
+  debug: 2,
+};
+const LOG_VERBOSITY = parseInt(process.env.LOG_VERBOSITY) || LOG_LEVELS.log;
 
-# Check if the client ID and secret ID are present in the credentials file
-with open(credentials_file, 'r') as file:
-    lines = file.readlines()
-    client_id = None
-    client_secret = None
-    for line in lines:
-        if line.startswith('client_id='):
-            client_id = line.split('=')[1].strip()
-        elif line.startswith('client_secret='):
-            client_secret = line.split('=')[1].strip()
+// Logger class for logging messages
+class Logger {
+  static log(module, message) {
+    if (LOG_LEVELS.log <= LOG_VERBOSITY) {
+      const timestamp = new Date().toISOString();
+      console.log(JSON.stringify({ timestamp, module, level: 'log', message }));
+    }
+  }
 
-if client_id is None or client_secret is None:
-    print("Error: Invalid format in credentials file.")
-    print("Please make sure the credentials file contains the client ID and secret ID.")
-    exit(1)
+  static error(module, message) {
+    if (LOG_LEVELS.error <= LOG_VERBOSITY) {
+      const timestamp = new Date().toISOString();
+      console.error(JSON.stringify({ timestamp, module, level: 'error', message }));
+    }
+  }
 
-# Populate the artifact_config dictionary after validation
-artifact_config = {
-    "base_url": os.getenv("BASE_URL", "default_value"),
-    "use_cert": os.getenv("USE_CERT", "false"),
-    "credentials_file": credentials_file
+  static debug(module, message) {
+    if (LOG_LEVELS.debug <= LOG_VERBOSITY) {
+      const timestamp = new Date().toISOString();
+      console.log(JSON.stringify({ timestamp, module, level: 'debug', message }));
+    }
+  }
 }
 
-# Proceed with the program logic using artifact_config
-# ...
+// SchemaValidator class for validating input using Joi
+class SchemaValidator {
+  static validate(input, schema) {
+    const { error, value } = schema.validate(input);
+    if (error) {
+      throw new Error(`Validation error: ${error.message}`);
+    }
+    return value;
+  }
+}
+
+// FileHandler class for reading client_id and client_secret from a file
+class FileHandler {
+  static readCredentialsFromFile(filePath) {
+    try {
+      const fileData = fs.readFileSync(filePath, 'utf8');
+      const { client_id, client_secret } = JSON.parse(fileData);
+      Logger.debug(`Credentials: ${DEBUG ? JSON.stringify({ client_id, client_secret }) : '********'}`);
+      return { client_id, client_secret };
+    } catch (error) {
+      Logger.error(`Error reading credentials from file: ${error.message}`);
+      return null;
+    }
+  }
+}
+
+// ArchiveExtractor class for extracting different archive types
+class ArchiveExtractor {
+  static async extractTarGz(source, destination) {
+    await extractTarGz({ file: source, cwd: destination });
+    Logger.log('Tar.gz file extracted successfully');
+  }
+
+  static async extractZip(source, destination) {
+    await extractZip(source).extract({ path: destination });
+    Logger.log('Zip file extracted successfully');
+  }
+}
+
+// OAuthValidator class for fetching and validating OAuth JWT token
+class OAuthValidator {
+  constructor(client_id, client_secret) {
+    this.client_id = client_id;
+    this.client_secret = client_secret;
+  }
+
+  fetchToken() {
+    // Implement OAuth token fetching logic here using client_id and client_secret
+    // Return a Promise that resolves with the token
+    // Example implementation using a dummy token for demonstration purposes:
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        const dummyToken = jwt.sign({ username: 'example_user' }, 'dummy_secret');
+        Logger.log('Token fetched successfully');
+        Logger.debug(`Token: ${DEBUG ? dummyToken : '********'}`);
+        resolve(dummyToken);
+      }, 2000);
+    });
+  }
+
+  validateToken(token) {
+    // Implement token validation logic here
+    // Return a Promise that resolves with true if the token is valid, or false if it is invalid
+    // Example implementation using a dummy token for demonstration purposes:
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        try {
+          const decodedToken = jwt.verify(token, 'dummy_secret');
+          Logger.log('Token validated successfully');
+          resolve(true);
+        } catch (error) {
+          Logger.error(`Token validation error: ${error.message}`);
+          resolve(false);
+        }
+      }, 1000);
+    });
+  }
+}
+
+// ServiceUploader class for uploading a service to an API endpoint
+class ServiceUploader {
+  static async uploadService(serviceData, endpoint) {
+    try {
+      const options = {
+        method: 'POST',
+        uri: endpoint,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: serviceData,
+        resolveWithFullResponse: true, // Return the full response object
+        json: true, // Automatically parse response body as JSON
+      };
+
+      const response = await request(options);
+
+      Logger.log(`Upload Response: ${JSON.stringify(response.body)}`);
+      Logger.log(`HTTP Status Code: ${response.statusCode}`);
+      return response.statusCode;
+    } catch (error) {
+      Logger.error(`Service upload error: ${error.message}`);
+      throw error;
+    }
+  }
+}
+
+// Application class to orchestrate the download, authentication, and upload process
+class Application {
+  constructor(credentialsFilePath, archiveType, artifactoryURL, apiEndpoint) {
+    this.credentialsFilePath = credentialsFilePath;
+    this.archiveType = archiveType;
+    this.artifactoryURL = artifactoryURL;
+    this.apiEndpoint = apiEndpoint;
+  }
+
+  async run() {
+    const { client_id, client_secret } = FileHandler.readCredentialsFromFile(this.credentialsFilePath);
+    if (!client_id || !client_secret) {
+      Logger.error('Invalid credentials');
+      return;
+    }
+
+    try {
+      await this.downloadFile(this.artifactoryURL, 'downloaded_file');
+      const oauthValidator = new OAuthValidator(client_id, client_secret);
+      const token = await oauthValidator.fetchToken();
+      const isValidToken = await oauthValidator.validateToken(token);
+      if (isValidToken) {
+        const serviceData = fs.readFileSync('service_data.json', 'utf8'); // Replace with your service data file
+        const uploadResponse = await ServiceUploader.uploadService(serviceData, this.apiEndpoint);
+        Logger.log(`Upload Response: ${JSON.stringify(uploadResponse)}`);
+      } else {
+        Logger.error('Invalid token');
+      }
+    } catch (error) {
+      Logger.error(`Error running the application: ${error.message}`);
+    }
+  }
+
+  async downloadFile(url, destination) {
+    return new Promise((resolve, reject) => {
+      const fileStream = fs.createWriteStream(`${destination}.${this.archiveType}`);
+      request(url)
+        .on('response', (response) => {
+          Logger.debug(`Download File Size: ${DEBUG ? response.headers['content-length'] : '********'}`);
+        })
+        .pipe(fileStream)
+        .on('finish', async () => {
+          Logger.log('File downloaded successfully');
+          await this.extractFile(`${destination}.${this.archiveType}`, destination);
+          resolve();
+        })
+        .on('error', (error) => {
+          Logger.error(`Error downloading file: ${error.message}`);
+          reject(error);
+        });
+    });
+  }
+
+  async extractFile(source, destination) {
+    switch (this.archiveType) {
+      case 'tar.gz':
+        await ArchiveExtractor.extractTarGz(source, destination);
+        break;
+      case 'zip':
+        await ArchiveExtractor.extractZip(source, destination);
+        break;
+      default:
+        Logger.error(`Unsupported archive type: ${this.archiveType}`);
+        break;
+    }
+  }
+}
+
+// Define schema for validating input
+const schema = Joi.object({
+  CREDENTIALS_FILE_PATH: Joi.string().required(),
+  ARCHIVE_TYPE: Joi.string().valid('tar.gz', 'zip').required(),
+  ARTIFACTORY_URL: Joi.string().uri().required(),
+  API_ENDPOINT: Joi.string().uri().required(),
+  DEBUG: Joi.string().valid('true', 'false').required(),
+});
+
+// Validate environment variables against the schema
+const envVars = SchemaValidator.validate(process.env, schema);
+
+// Create and run the application
+const app = new Application(
+  envVars.CREDENTIALS_FILE_PATH,
+  envVars.ARCHIVE_TYPE,
+  envVars.ARTIFACTORY_URL,
+  envVars.API_ENDPOINT
+);
+app.run();
+
+
+========= unit
+
+// Import necessary dependencies and modules
+
+// Mock the Logger class
+jest.mock('./Logger');
+
+// Import the modules to test
+const { Application, FileHandler, OAuthValidator, ServiceUploader } = require('./your-modules');
+
+// Create a test suite for the Application class
+describe('Application', () => {
+  // Create a test case for the run method
+  describe('run', () => {
+    // Create a test case for valid credentials
+    test('should run successfully with valid credentials', async () => {
+      // Mock the necessary dependencies and setup necessary variables
+      const mockCredentials = { client_id: 'valid_client_id', client_secret: 'valid_client_secret' };
+      FileHandler.readCredentialsFromFile.mockReturnValue(mockCredentials);
+      const mockToken = 'valid_token';
+      OAuthValidator.prototype.fetchToken.mockResolvedValue(mockToken);
+      OAuthValidator.prototype.validateToken.mockResolvedValue(true);
+      const mockServiceData = 'mock_service_data';
+      fs.readFileSync.mockReturnValue(mockServiceData);
+      const mockUploadResponse = { statusCode: 200 };
+      ServiceUploader.uploadService.mockResolvedValue(mockUploadResponse);
+
+      // Create an instance of the Application class with mock inputs
+      const app = new Application('valid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
+
+      // Run the application
+      await app.run();
+
+      // Verify that the necessary methods are called with the expected arguments
+      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('valid_credentials_file_path');
+      expect(OAuthValidator.prototype.fetchToken).toHaveBeenCalled();
+      expect(OAuthValidator.prototype.validateToken).toHaveBeenCalledWith(mockToken);
+      expect(fs.readFileSync).toHaveBeenCalledWith('service_data.json', 'utf8');
+      expect(ServiceUploader.uploadService).toHaveBeenCalledWith(mockServiceData, 'valid_api_endpoint');
+
+      // Verify that the necessary log messages are called
+      expect(Logger.log).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Token fetched successfully'));
+      expect(Logger.log).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Upload Response'));
+
+      // Verify the successful completion of the application
+      expect(Logger.error).not.toHaveBeenCalled();
+    });
+
+    // Create a test case for invalid credentials
+    test('should log an error with invalid credentials', async () => {
+      // Mock the necessary dependencies and setup necessary variables
+      FileHandler.readCredentialsFromFile.mockReturnValue(null);
+
+      // Create an instance of the Application class with mock inputs
+      const app = new Application('invalid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
+
+      // Run the application
+      await app.run();
+
+      // Verify that the necessary methods are called with the expected arguments
+      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('invalid_credentials_file_path');
+
+      // Verify that the necessary log messages are called
+      expect(Logger.error).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Invalid credentials'));
+      expect(Logger.log).not.toHaveBeenCalled();
+    });
+
+    // Create a test case for invalid token
+    test('should log an error with invalid token', async () => {
+      // Mock the necessary dependencies and setup necessary variables
+      const mockCredentials = { client_id: 'valid_client_id', client_secret: 'valid_client_secret' };
+      FileHandler.readCredentialsFromFile.mockReturnValue(mockCredentials);
+      const mockToken = 'valid_token';
+      OAuthValidator.prototype.fetchToken.mockResolvedValue(mockToken);
+      OAuthValidator.prototype.validateToken.mockResolvedValue(false);
+
+      // Create an instance of the Application class with mock inputs
+      const app = new Application('valid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
+
+      // Run the application
+      await app.run();
+
+      // Verify that the necessary methods are called with the expected arguments
+      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('valid_credentials_file_path');
+      expect(OAuthValidator.prototype.fetchToken).toHaveBeenCalled();
+      expect(OAuthValidator.prototype.validateToken).toHaveBeenCalledWith(mockToken);
+
+      // Verify that the necessary log messages are called
+      expect(Logger.error).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Invalid token'));
+      expect(Logger.log).not.toHaveBeenCalled();
+    });
+
+    // Create a test case for an error during application execution
+    test('should log an error with application execution error', async () => {
+      // Mock the necessary dependencies and setup necessary variables
+      const mockCredentials = { client_id: 'valid_client_id', client_secret: 'valid_client_secret' };
+      FileHandler.readCredentialsFromFile.mockReturnValue(mockCredentials);
+      const mockToken = 'valid_token';
+      OAuthValidator.prototype.fetchToken.mockResolvedValue(mockToken);
+      OAuthValidator.prototype.validateToken.mockResolvedValue(true);
+      const mockError = new Error('Application error');
+      fs.readFileSync.mockImplementation(() => {
+        throw mockError;
+      });
+
+      // Create an instance of the Application class with mock inputs
+      const app = new Application('valid_credentials_file_path', 'tar.gz', 'valid_artifactory_url', 'valid_api_endpoint');
+
+      // Run the application
+      await app.run();
+
+      // Verify that the necessary methods are called with the expected arguments
+      expect(FileHandler.readCredentialsFromFile).toHaveBeenCalledWith('valid_credentials_file_path');
+      expect(OAuthValidator.prototype.fetchToken).toHaveBeenCalled();
+      expect(OAuthValidator.prototype.validateToken).toHaveBeenCalledWith(mockToken);
+      expect(fs.readFileSync).toHaveBeenCalledWith('service_data.json', 'utf8');
+
+      // Verify that the necessary log messages are called
+      expect(Logger.error).toHaveBeenCalledWith(expect.any(String), expect.stringContaining('Error running the application'));
+      expect(Logger.log).not.toHaveBeenCalled();
+    });
+  });
+});
+
+
+---------- package.json
+
+{
+  "name": "your-app",
+  "version": "1.0.0",
+  "description": "Your Node.js application description",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "mocha"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.17.1",
+    "joi": "^17.4.0",
+    "dotenv": "^10.0.0",
+    "request-promise-native": "^1.0.9",
+    "jsonwebtoken": "^8.5.1",
+    "tar": "^6.1.0",
+    "unzipper": "^0.10.11"
+  },
+  "devDependencies": {
+    "mocha": "^9.1.1",
+    "chai": "^4.3.4",
+    "sinon": "^11.1.1"
+  }
+}
+
+
+-------- dockerfile
+
+# Use an official Node.js runtime as the base image
+FROM node:14-alpine
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Copy package.json and package-lock.json to the working directory
+COPY package*.json ./
+
+# Install the application dependencies
+RUN npm install --production
+
+# Copy the application source code to the working directory
+COPY . .
+
+# Expose the port that the application listens on (if applicable)
+EXPOSE 3000
+
+# Set the command to run your Node.js application
+CMD [ "node", "app.js" ]
