@@ -1,29 +1,36 @@
-  async downloadFile(url, destination) {
-    return new Promise((resolve, reject) => {
-      const fileStream = fs.createWriteStream(`${destination}.${this.archiveType}`);
-      request({
-        url,
-        agentOptions: {
-          cert: fs.readFileSync(this.certificatePath),
-          key: fs.readFileSync(this.key),
-          passphrase: this.username
-        }
-      })
-        .on('response', (response) => {
-          Logger.debug(`Download File Size: ${process.env.DEBUG ? response.headers['content-length'] : '********'}`);
-        })
-        .pipe(fileStream)
-        .on('finish', async () => {
-          Logger.log('File downloaded successfully');
-          await this.extractFile(`${destination}.${this.archiveType}`, destination);
-          resolve();
-        })
-        .on('error', (error) => {
-          Logger.error(`Error downloading file: ${error.message}`);
-          reject(error);
-        });
+ const https = require('https');
+const fs = require('fs');
+
+async function downloadFile(url, destination, certificatePath) {
+  const fileStream = fs.createWriteStream(destination);
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'your-artifactory-url.com',
+      path: '/path/to/file',
+      method: 'GET',
+      cert: fs.readFileSync(certificatePath),
+    };
+
+    const request = https.request(options, (response) => {
+      response.pipe(fileStream);
+
+      fileStream.on('finish', () => {
+        fileStream.close();
+        resolve();
+      });
     });
-  }
+
+    request.on('error', (error) => {
+      fs.unlink(destination, () => {
+        reject(error);
+      });
+    });
+
+    request.end();
+  });
+}
+
 
 your-app/
   |- src/
