@@ -12,7 +12,7 @@ class ServiceController {
       });
 
       Logger.log('Service data uploaded successfully');
-      Logger.log('Response:', response.data);
+      Logger.log('Response:', JSON.stringify(response.data));
 
       if (response.status === 200) {
         return { success: true, status: response.status };
@@ -24,7 +24,7 @@ class ServiceController {
 
       if (error.response) {
         Logger.error('Response status:', error.response.status);
-        Logger.error('Response data:', error.response.data);
+        Logger.error('Response data:', JSON.stringify(error.response.data));
         return { success: false, status: error.response.status };
       } else {
         return { success: false, status: 500 }; // Internal Server Error
@@ -34,6 +34,7 @@ class ServiceController {
 }
 
 module.exports = ServiceController;
+
 
 
   const uploadResponse = await ServiceController.uploadService(serviceData, API_ENDPOINT, token);
