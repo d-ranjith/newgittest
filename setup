@@ -1,633 +1,824 @@
-const axios = require('axios');
-const Logger = require('../config/logger');
+- src
+  - main
+    - java
+      - com
+        - yourcompany
+          - app
+            - config
+              - AppConfiguration.java
+            - model
+              - FormData.java
+              - OAuthToken.java
+            - service
+              - ArtifactoryService.java
+              - OAuthService.java
+              - ApiService.java
+            - App.java
+        - exception
+          - CustomExceptionMapper.java
+        - util
+          - ArchiveExtractor.java
+    - resources
+      - application.properties
+  - test
+    - java
+      - com
+        - yourcompany
+          - app
+            - service
+              - ArtifactoryServiceTest.java
+              - OAuthServiceTest.java
+              - ApiServiceTest.java
+    - resources
+      - application.properties
 
-class ServiceController {
-  static async uploadService(serviceData, endpoint, token) {
-    try {
-      const response = await axios.post(endpoint, serviceData, {
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
-      Logger.log('Service data uploaded successfully');
-      Logger.log('Response:', JSON.stringify(response.data));
 
-      if (response.status === 200) {
-        return { success: true, status: response.status };
-      } else {
-        return { success: false, status: response.status };
-      }
-    } catch (error) {
-      Logger.error('Service upload error:', error.message);
+resources.properties
 
-      if (error.response) {
-        Logger.error('Response status:', error.response.status);
-        Logger.error('Response data:', JSON.stringify(error.response.data));
-        return { success: false, status: error.response.status };
-      } else {
-        return { success: false, status: 500 }; // Internal Server Error
-      }
+# Application Configuration
+app.api.endpoint=https://api.example.com
+app.artifactory.username=${ARTIFACTORY_USERNAME}
+app.artifactory.apikey=${ARTIFACTORY_API_KEY}
+app.artifactory.certificate.path=${ARTIFACTORY_CERTIFICATE_PATH}
+app.oauth.client.id=${OAUTH_CLIENT_ID}
+app.oauth.client.secret=${OAUTH_CLIENT_SECRET}
+
+# Logging Configuration
+log.debug.level=INFO
+log.verbosity=LOW
+log.pattern=%d{yyyy-MM-dd HH:mm:ss} %-5p [%c{1}] %m%n
+log.console.color=true
+
+# Quarkus Configuration
+quarkus.http.port=8080
+quarkus.smallrye-jwt.enabled=true
+
+
+----- unit tests
+
+ArtifactoryServiceTest.java:
+
+java
+Copy code
+package com.yourcompany.app.service;
+
+import com.yourcompany.app.config.AppConfiguration;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import static org.mockito.Mockito.*;
+
+class ArtifactoryServiceTest {
+
+    @Mock
+    private AppConfiguration appConfiguration;
+
+    @InjectMocks
+    private ArtifactoryService artifactoryService;
+
+    @BeforeEach
+    void setup() {
+        MockitoAnnotations.openMocks(this);
     }
-  }
+
+    @Test
+    void testDownloadFileFromArtifactory() {
+        // Mock the required dependencies
+        String username = "testUser";
+        String apiKey = "testApiKey";
+        String certificatePath = "testCertificatePath";
+        when(appConfiguration.getArtifactoryUsername()).thenReturn(username);
+        when(appConfiguration.getArtifactoryApiKey()).thenReturn(apiKey);
+        when(appConfiguration.getArtifactoryCertificatePath()).thenReturn(certificatePath);
+
+        // Add your test logic here to verify the behavior of the downloadFileFromArtifactory method
+    }
+
+    @Test
+    void testGetFileSize() {
+        // Mock the required dependencies
+
+        // Add your test logic here to verify the behavior of the getFileSize method
+    }
+}
+OAuthServiceTest.java:
+
+java
+Copy code
+package com.yourcompany.app.service;
+
+import com.yourcompany.app.config.AppConfiguration;
+import com.yourcompany.app.model.OAuthToken;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import static org.mockito.Mockito.*;
+
+class OAuthServiceTest {
+
+    @Mock
+    private AppConfiguration appConfiguration;
+
+    @InjectMocks
+    private OAuthService oauthService;
+
+    @BeforeEach
+    void setup() {
+        MockitoAnnotations.openMocks(this);
+    }
+
+    @Test
+    void testFetchAccessToken() {
+        // Mock the required dependencies
+        String clientId = "testClientId";
+        String clientSecret = "testClientSecret";
+        when(appConfiguration.getOauthClientId()).thenReturn(clientId);
+        when(appConfiguration.getOauthClientSecret()).thenReturn(clientSecret);
+
+        // Add your test logic here to verify the behavior of the fetchAccessToken method
+    }
+}
+ApiServiceTest.java:
+
+java
+Copy code
+package com.yourcompany.app.service;
+
+import com.yourcompany.app.config.AppConfiguration;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+
+import static org.mockito.Mockito.*;
+
+class ApiServiceTest {
+
+    @Mock
+    private AppConfiguration appConfiguration;
+
+    @InjectMocks
+    private ApiService apiService;
+
+    @BeforeEach
+    void setup() {
+        MockitoAnnotations.openMocks(this);
+    }
+
+    @Test
+    void testUploadPayload() {
+        // Mock the required dependencies
+        String apiEndpoint = "testApiEndpoint";
+        when(appConfiguration.getApiEndpoint()).thenReturn(apiEndpoint);
+
+        // Add your test logic here to verify the behavior of the uploadPayload method
+    }
 }
 
-module.exports = ServiceController;
 
+---------------------------------
 
+package com.yourcompany.app;
 
-  const uploadResponse = await ServiceController.uploadService(serviceData, API_ENDPOINT, token);
+import com.yourcompany.app.config.AppConfiguration;
+import com.yourcompany.app.model.FormData;
+import com.yourcompany.app.model.OAuthToken;
+import com.yourcompany.app.service.ArtifactoryService;
+import com.yourcompany.app.service.OAuthService;
+import com.yourcompany.app.service.ApiService;
+import com.yourcompany.app.util.ArchiveExtractor;
+import com.yourcompany.app.logger.Logger;
 
-  if (uploadResponse.success) {
-    Logger.log('Service data upload successful');
-    Logger.log('HTTP Status Code:', uploadResponse.status);
-  } else {
-    Logger.error('Service data upload failed');
-    Logger.error('HTTP Status Code:', uploadResponse.status);
-  }
+import javax.inject.Inject;
+import javax.inject.Singleton;
+import java.util.Map;
 
+@Singleton
+public class App {
 
+    @Inject
+    AppConfiguration appConfiguration;
 
+    @Inject
+    ArtifactoryService artifactoryService;
 
-const fileURL = 'https://your-artifactory-url.com/path/to/file';
-const destinationPath = 'path/to/destination/file';
+    @Inject
+    OAuthService oauthService;
 
-downloadFile(fileURL, destinationPath)
-  .then(() => {
-    console.log('File downloaded successfully');
-  })
-  .catch((error) => {
-    console.error('Error downloading file:', error.message);
-  });
+    @Inject
+    ApiService apiService;
 
+    @Inject
+    ArchiveExtractor archiveExtractor;
 
-
-
-your-app/
-  |- src/
-  |   |- config/
-  |   |    |- logger.js
-  |   |    |- schema.js
-  |   |
-  |   |- controllers/
-  |   |    |- FileController.js
-  |   |    |- OAuthController.js
-  |   |    |- ServiceController.js
-  |   |
-  |   |- models/
-  |   |    |- Service.js
-  |   |
-  |   |- utils/
-  |   |    |- FileHandler.js
-  |   |    |- Logger.js
-  |   |
-  |   |- app.js
-  |
-  |- tests/
-  |   |- FileController.test.js
-  |   |- OAuthController.test.js
-  |   |- ServiceController.test.js
-  |
-  |- .env
-  |- Dockerfile
-  |- package.json
-  |- README.md
-
-Here are the contents of the code files based on the provided folder structure:
-
-logger.js (src/config/logger.js):
-javascript
-Copy code
-const { createLogger, format, transports } = require('winston');
-const { combine, timestamp, printf } = format;
-
-const logFormat = printf(({ level, message, timestamp }) => {
-  return `${timestamp} [${level.toUpperCase()}] - ${message}`;
-});
-
-const logger = createLogger({
-  format: combine(timestamp(), logFormat),
-  transports: [new transports.Console()],
-});
-
-module.exports = logger;
-schema.js (src/config/schema.js):
-javascript
-Copy code
-const Joi = require('joi');
-
-const schema = Joi.object({
-  CREDENTIALS_FILE_PATH: Joi.string().required(),
-  ARCHIVE_TYPE: Joi.string().valid('tar.gz', 'zip').required(),
-  ARTIFACTORY_URL: Joi.string().uri().required(),
-  API_ENDPOINT: Joi.string().uri().required(),
-  DEBUG: Joi.string().valid('true', 'false').required(),
-});
-
-module.exports = schema;
-FileController.js (src/controllers/FileController.js):
-javascript
-Copy code
-const fs = require('fs');
-const Logger = require('../config/logger');
-
-class FileController {
-  static readCredentialsFromFile(filePath) {
-    try {
-      const fileData = fs.readFileSync(filePath, 'utf8');
-      const { client_id, client_secret } = JSON.parse(fileData);
-      Logger.debug(`Credentials: ${process.env.DEBUG ? JSON.stringify({ client_id, client_secret }) : '********'}`);
-      return { client_id, client_secret };
-    } catch (error) {
-      Logger.error(`Error reading credentials from file: ${error.message}`);
-      return null;
+    public static void main(String[] args) {
+        App app = new App();
+        app.run();
     }
-  }
+
+    public void run() {
+        // Read the required configuration values from appConfiguration
+        String apiEndpoint = appConfiguration.getApiEndpoint();
+        String artifactoryUsername = appConfiguration.getArtifactoryUsername();
+        String artifactoryApiKey = appConfiguration.getArtifactoryApiKey();
+        String artifactoryCertificatePath = appConfiguration.getArtifactoryCertificatePath();
+        String oauthClientId = appConfiguration.getOauthClientId();
+        String oauthClientSecret = appConfiguration.getOauthClientSecret();
+
+        // Download the file from Artifactory using artifactoryService
+        artifactoryService.downloadFileFromArtifactory(artifactoryUsername, artifactoryApiKey, artifactoryCertificatePath);
+
+        // Get the file size using artifactoryService
+        String fileSizePath = System.getenv("FILE_SIZE_PATH");
+        long fileSize = artifactoryService.getFileSize(fileSizePath);
+
+        // Fetch the OAuth token using oauthService
+        OAuthToken token = oauthService.fetchOAuthToken(oauthClientId, oauthClientSecret);
+
+        // Upload the payload to the API endpoint using apiService
+        String payload = "{\"key\":\"value\"}";
+        apiService.uploadPayload(payload, apiEndpoint);
+
+        // Extract and show contents using archiveExtractor
+        String extractPath = System.getenv("EXTRACT_PATH");
+        archiveExtractor.extractContents(extractPath);
+
+        // Log message
+        logMessage("Execution completed", "DEBUG", "HIGH");
+    }
+
+    private void logMessage(String message, String level, String verbosity) {
+        String module = "your-module"; // Replace with your actual module name
+        Logger.logMessage(message, level, verbosity, module);
+    }
 }
 
-module.exports = FileController;
-OAuthController.js (src/controllers/OAuthController.js):
-javascript
+
+
+
+AppConfiguration.java:
+
+package com.yourcompany.app.config;
+
+import lombok.Getter;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
+@ApplicationScoped
+@Getter
+public class AppConfiguration {
+
+    @Inject
+    @ConfigProperty(name = "app.api.endpoint")
+    private String apiEndpoint;
+
+    @Inject
+    @ConfigProperty(name = "app.artifactory.username")
+    private String artifactoryUsername;
+
+    @Inject
+    @ConfigProperty(name = "app.artifactory.apikey")
+    private String artifactoryApiKey;
+
+    @Inject
+    @ConfigProperty(name = "app.artifactory.certificate.path")
+    private String artifactoryCertificatePath;
+
+    @Inject
+    @ConfigProperty(name = "app.oauth.client.id")
+    private String oauthClientId;
+
+    @Inject
+    @ConfigProperty(name = "app.oauth.client.secret")
+    private String oauthClientSecret;
+}
+
+
+
+
+FormData.java:
+
+java
 Copy code
-const jwt = require('jsonwebtoken');
-const Logger = require('../config/logger');
+package com.yourcompany.app.model;
 
-class OAuthController {
-  constructor(client_id, client_secret) {
-    this.client_id = client_id;
-    this.client_secret = client_secret;
-  }
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-  fetchToken() {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const dummyToken = jwt.sign({ username: 'example_user' }, 'dummy_secret');
-        Logger.log('Token fetched successfully');
-        Logger.debug(`Token: ${process.env.DEBUG ? dummyToken : '********'}`);
-        resolve(dummyToken);
-      }, 2000);
-    });
-  }
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class FormData {
+    private String name;
+    private String value;
+}
+OAuthToken.java:
 
-  validateToken(token) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        try {
-          const decodedToken = jwt.verify(token, 'dummy_secret');
-          Logger.log('Token validated successfully');
-          resolve(true);
-        } catch (error) {
-          Logger.error(`Token validation error: ${error.message}`);
-          resolve(false);
+java
+Copy code
+package com.yourcompany.app.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OAuthToken {
+    private String accessToken;
+    private String tokenType;
+    private int expiresIn;
+}
+
+ArtifactoryService.java:
+
+package com.yourcompany.app.service;
+
+import com.yourcompany.app.config.AppConfiguration;
+import com.yourcompany.app.logger.Logger;
+import lombok.extern.slf4j.Slf4j;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Invocation;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
+
+@ApplicationScoped
+@Slf4j
+public class ArtifactoryService {
+
+    @Inject
+    AppConfiguration appConfiguration;
+
+    public void downloadFileFromArtifactory() {
+        String username = System.getenv("ARTIFACTORY_USERNAME");
+        String apiKey = System.getenv("ARTIFACTORY_API_KEY");
+        String certificatePath = System.getenv("ARTIFACTORY_CERTIFICATE_PATH");
+
+        String artifactoryUrl;
+        if ("DEV".equalsIgnoreCase(System.getenv("ENVIRONMENT"))) {
+            artifactoryUrl = appConfiguration.getDevArtifactoryUrl();
+        } else {
+            artifactoryUrl = appConfiguration.getProdArtifactoryUrl();
         }
-      }, 1000);
-    });
-  }
-}
 
-module.exports = OAuthController;
-ServiceController.js (src/controllers/ServiceController.js):
-javascript
-Copy code
-const fs = require('fs');
-const request = require('request-promise-native');
-const Logger = require('../config/logger');
+        // Create the REST client with SSLContext
+        Client client = createSSLClient(certificatePath);
 
-class ServiceController {
-  static async uploadService(serviceData, endpoint) {
-    try {
-      const options = {
-        method: 'POST',
-        uri: endpoint,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: serviceData,
-        resolveWithFullResponse: true,
-        json: true,
-      };
+        try {
+            // Build the Artifactory API URL
+            String apiUrl = artifactoryUrl + "/path/to/file";
 
-      const response = await request(options);
+            // Send a GET request to the Artifactory API
+            Invocation.Builder builder = client.target(apiUrl)
+                    .request(MediaType.APPLICATION_OCTET_STREAM)
+                    .header("X-JFrog-Art-Api", apiKey)
+                    .header("Authorization", "Bearer " + getAuthToken(username, apiKey));
 
-      Logger.log(`Upload Response: ${JSON.stringify(response.body)}`);
-      Logger.log(`HTTP Status Code: ${response.statusCode}`);
-      return response.statusCode;
-    } catch (error) {
-      Logger.error(`Service upload error: ${error.message}`);
-      throw error;
-    }
-  }
-}
+            Response response = builder.get();
 
-module.exports = ServiceController;
+            // Check if the request was successful
+            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+                // Get the input stream from the response
+                InputStream inputStream = response.readEntity(InputStream.class);
 
-Here are the remaining code files based on the provided folder structure:
+                // Create the output file
+                String outputFile = "path/to/output/file";
+                OutputStream outputStream = new FileOutputStream(outputFile);
 
-Service.js (src/models/Service.js):
-javascript
-Copy code
-class Service {
-  static async extractTarGz(source, destination) {
-    // Implementation for extracting tar.gz archives
-  }
+                // Copy the input stream to the output file
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
 
-  static async extractZip(source, destination) {
-    // Implementation for extracting zip archives
-  }
-}
+                // Close the input and output streams
+                inputStream.close();
+                outputStream.close();
 
-module.exports = Service;
-FileHandler.js (src/utils/FileHandler.js):
-javascript
-Copy code
-const fs = require('fs');
-const Logger = require('../config/logger');
-
-class FileHandler {
-  static readCredentialsFromFile(filePath) {
-    try {
-      const fileData = fs.readFileSync(filePath, 'utf8');
-      const { client_id, client_secret } = JSON.parse(fileData);
-      Logger.debug(`Credentials: ${process.env.DEBUG ? JSON.stringify({ client_id, client_secret }) : '********'}`);
-      return { client_id, client_secret };
-    } catch (error) {
-      Logger.error(`Error reading credentials from file: ${error.message}`);
-      return null;
-    }
-  }
-}
-
-module.exports = FileHandler;
-app.js (src/app.js):
-javascript
-Copy code
-const fs = require('fs');
-const request = require('request');
-const jwt = require('jsonwebtoken');
-const dotenv = require('dotenv');
-const { promisify } = require('util');
-const { extractTarGz, extractZip } = require('./models/Service');
-const FileHandler = require('./utils/FileHandler');
-const Logger = require('./config/logger');
-const SchemaValidator = require('./config/schema');
-const { uploadService } = require('./controllers/ServiceController');
-const { fetchToken, validateToken } = require('./controllers/OAuthController');
-
-dotenv.config();
-
-class Application {
-  constructor(credentialsFilePath, archiveType, artifactoryURL, apiEndpoint) {
-    this.credentialsFilePath = credentialsFilePath;
-    this.archiveType = archiveType;
-    this.artifactoryURL = artifactoryURL;
-    this.apiEndpoint = apiEndpoint;
-  }
-
-  async run() {
-    const { client_id, client_secret } = FileHandler.readCredentialsFromFile(this.credentialsFilePath);
-    if (!client_id || !client_secret) {
-      Logger.error('Invalid credentials');
-      return;
+                Logger.logMessage("File downloaded from Artifactory", "INFO", "HIGH", "ArtifactoryService");
+            } else {
+                Logger.logMessage("Failed to download file from Artifactory: " + response.getStatusInfo().getReasonPhrase(), "ERROR", "HIGH", "ArtifactoryService");
+            }
+        } catch (IOException e) {
+            Logger.logMessage("Error occurred while downloading file from Artifactory", "ERROR", "HIGH", "ArtifactoryService");
+            log.error("Error occurred while downloading file from Artifactory", e);
+        } finally {
+            // Close the REST client
+            client.close();
+        }
     }
 
-    try {
-      await this.downloadFile(this.artifactoryURL, 'downloaded_file');
-      const token = await fetchToken(client_id, client_secret);
-      const isValidToken = await validateToken(token);
-      if (isValidToken) {
-        const serviceData = fs.readFileSync('service_data.json', 'utf8');
-        const uploadResponse = await uploadService(serviceData, this.apiEndpoint);
-        Logger.log(`Upload Response: ${JSON.stringify(uploadResponse)}`);
-      } else {
-        Logger.error('Invalid token');
-      }
-    } catch (error) {
-      Logger.error(`Error running the application: ${error.message}`);
+    private String getAuthToken(String username, String apiKey) {
+        // Implement the logic to fetch the authentication token from JFrog Artifactory
+        // This may involve making a request to a specific endpoint and using the provided username and API key
+
+        // Example implementation with basic authentication
+        // Replace the endpoint and implementation logic based on your specific authentication method
+
+        String authEndpoint = "https://artifactory.example.com/api/auth";
+
+        // Create the REST client
+        Client client = ClientBuilder.newClient();
+
+        try {
+            // Build the authentication API URL
+            String apiUrl = authEndpoint + "?username=" + username + "&apiKey=" + apiKey;
+
+            // Send a GET request to the authentication API
+            Response response = client.target(apiUrl)
+                    .request(MediaType.APPLICATION_JSON)
+                    .get();
+
+            // Check if the request was successful
+            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+                // Parse the response and extract the authentication token
+                JsonObject jsonResponse = response.readEntity(JsonObject.class);
+                String authToken = jsonResponse.getString("token");
+
+                Logger.logMessage("Authentication token fetched successfully", "INFO", "HIGH", "ArtifactoryService");
+
+                return authToken;
+            } else {
+                Logger.logMessage("Failed to fetch authentication token: " + response.getStatusInfo().getReasonPhrase(), "ERROR", "HIGH", "ArtifactoryService");
+            }
+        } catch (Exception e) {
+            Logger.logMessage("Error occurred while fetching authentication token", "ERROR", "HIGH", "ArtifactoryService");
+            log.error("Error occurred while fetching authentication token", e);
+        } finally {
+            // Close the REST client
+            client.close();
+        }
+
+        return ""; // Return an empty string if the token couldn't be fetched
     }
-  }
 
-  async downloadFile(url, destination) {
-    return new Promise((resolve, reject) => {
-      const fileStream = fs.createWriteStream(`${destination}.${this.archiveType}`);
-      request(url)
-        .on('response', (response) => {
-          Logger.debug(`Download File Size: ${process.env.DEBUG ? response.headers['content-length'] : '********'}`);
-        })
-        .pipe(fileStream)
-        .on('finish', async () => {
-          Logger.log('File downloaded successfully');
-          await this.extractFile(`${destination}.${this.archiveType}`, destination);
-          resolve();
-        })
-        .on('error', (error) => {
-          Logger.error(`Error downloading file: ${error.message}`);
-          reject(error);
-        });
-    });
-  }
+    private Client createSSLClient(String certificatePath) {
+        try {
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            keyStore.load(getClass().getClassLoader().getResourceAsStream(certificatePath), "password".toCharArray());
 
-  async extractFile(source, destination) {
-    switch (this.archiveType) {
-      case 'tar.gz':
-        await Service.extractTarGz(source, destination);
-        break;
-      case 'zip':
-        await Service.extractZip(source, destination);
-        break;
-      default:
-        Logger.error(`Unsupported archive type: ${this.archiveType}`);
-        break;
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, null, null);
+            SSLParameters sslParameters = sslContext.getDefaultSSLParameters();
+            sslParameters.setNeedClientAuth(true);
+            sslParameters.setKeyStore(keyStore);
+
+            return ClientBuilder.newBuilder()
+                    .sslContext(sslContext)
+                    .sslParameters(sslParameters)
+                    .build();
+        } catch (IOException | GeneralSecurityException e) {
+            Logger.logMessage("Error occurred while creating SSL client", "ERROR", "HIGH", "ArtifactoryService");
+            log.error("Error occurred while creating SSL client", e);
+            return null;
+        }
     }
-  }
-}
-
-const envVars = SchemaValidator.validate(process.env);
-
-const app = new Application(
-  envVars.CREDENTIALS_FILE_PATH,
-  envVars.ARCHIVE_TYPE,
-  envVars.ARTIFACTORY_URL,
-  envVars.API_ENDPOINT
-);
-app.run();
-
-
-
----- unit tests
-FileController.test.js (tests/FileController.test.js):
-
-const fs = require('fs');
-const FileController = require('../src/controllers/FileController');
-
-describe('FileController', () => {
-  describe('readCredentialsFromFile', () => {
-    it('should read credentials from file and return an object', () => {
-      // Set up
-      const filePath = 'test/credentials.json';
-      const expectedCredentials = {
-        client_id: 'your-client-id',
-        client_secret: 'your-client-secret',
-      };
-
-      // Mock the fs.readFileSync method
-      jest.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(expectedCredentials));
-
-      // Call the method being tested
-      const credentials = FileController.readCredentialsFromFile(filePath);
-
-      // Assertions
-      expect(credentials).toEqual(expectedCredentials);
-
-      // Restore the original method
-      fs.readFileSync.mockRestore();
-    });
-
-    it('should handle errors when reading credentials from file', () => {
-      // Set up
-      const filePath = 'test/non-existent-file.json';
-
-      // Mock the fs.readFileSync method to throw an error
-      jest.spyOn(fs, 'readFileSync').mockImplementation(() => {
-        throw new Error('File not found');
-      });
-
-      // Call the method being tested
-      const credentials = FileController.readCredentialsFromFile(filePath);
-
-      // Assertions
-      expect(credentials).toBeNull();
-
-      // Restore the original method
-      fs.readFileSync.mockRestore();
-    });
-  });
-});
-
-
-Copy code
-// Unit tests for FileController.js
-const jwt = require('jsonwebtoken');
-const OAuthController = require('../src/controllers/OAuthController');
-
-jest.mock('jsonwebtoken');
-
-describe('OAuthController', () => {
-  describe('fetchToken', () => {
-    it('should fetch a token successfully', async () => {
-      // Set up
-      const expectedToken = 'your-token';
-      const client_id = 'your-client-id';
-      const client_secret = 'your-client-secret';
-
-      // Mock the jwt.sign method
-      jwt.sign.mockReturnValue(expectedToken);
-
-      // Create an instance of the OAuthController
-      const oauthController = new OAuthController(client_id, client_secret);
-
-      // Call the method being tested
-      const token = await oauthController.fetchToken();
-
-      // Assertions
-      expect(token).toBe(expectedToken);
-
-      // Verify that jwt.sign was called with the correct arguments
-      expect(jwt.sign).toHaveBeenCalledWith({ username: 'example_user' }, client_secret);
-
-      // Restore the original method
-      jwt.sign.mockRestore();
-    });
-  });
-
-  describe('validateToken', () => {
-    it('should validate a valid token', async () => {
-      // Set up
-      const token = 'valid-token';
-      const client_id = 'your-client-id';
-      const client_secret = 'your-client-secret';
-
-      // Mock the jwt.verify method
-      jwt.verify.mockReturnValue(true);
-
-      // Create an instance of the OAuthController
-      const oauthController = new OAuthController(client_id, client_secret);
-
-      // Call the method being tested
-      const isValidToken = await oauthController.validateToken(token);
-
-      // Assertions
-      expect(isValidToken).toBe(true);
-
-      // Verify that jwt.verify was called with the correct arguments
-      expect(jwt.verify).toHaveBeenCalledWith(token, client_secret);
-
-      // Restore the original method
-      jwt.verify.mockRestore();
-    });
-
-    it('should handle an invalid token', async () => {
-      // Set up
-      const token = 'invalid-token';
-      const client_id = 'your-client-id';
-      const client_secret = 'your-client-secret';
-
-      // Mock the jwt.verify method to throw an error
-      jwt.verify.mockImplementation(() => {
-        throw new Error('Invalid token');
-      });
-
-      // Create an instance of the OAuthController
-      const oauthController = new OAuthController(client_id, client_secret);
-
-      // Call the method being tested
-      const isValidToken = await oauthController.validateToken(token);
-
-      // Assertions
-      expect(isValidToken).toBe(false);
-
-      // Verify that jwt.verify was called with the correct arguments
-      expect(jwt.verify).toHaveBeenCalledWith(token, client_secret);
-
-      // Restore the original method
-      jwt.verify.mockRestore();
-    });
-  });
-});
-
-
-
-javascript
-
-ServiceController.test.js (tests/ServiceController.test.js):
-
-
-const ServiceController = require('../src/controllers/ServiceController');
-const Service = require('../src/models/Service');
-
-jest.mock('../src/models/Service');
-
-describe('ServiceController', () => {
-  describe('uploadService', () => {
-    it('should upload a service successfully', async () => {
-      // Set up
-      const serviceData = 'your-service-data';
-      const endpoint = 'your-api-endpoint';
-      const statusCode = 200;
-
-      // Mock the Service model's static method
-      Service.uploadService.mockResolvedValue(statusCode);
-
-      // Create an instance of the ServiceController
-      const serviceController = new ServiceController();
-
-      // Call the method being tested
-      const response = await serviceController.uploadService(serviceData, endpoint);
-
-      // Assertions
-      expect(response).toBe(statusCode);
-
-      // Verify that Service.uploadService was called with the correct arguments
-      expect(Service.uploadService).toHaveBeenCalledWith(serviceData, endpoint);
-
-      // Restore the original method
-      Service.uploadService.mockRestore();
-    });
-
-    it('should handle a service upload error', async () => {
-      // Set up
-      const serviceData = 'your-service-data';
-      const endpoint = 'your-api-endpoint';
-      const errorMessage = 'Service upload failed';
-
-      // Mock the Service model's static method to throw an error
-      Service.uploadService.mockRejectedValue(new Error(errorMessage));
-
-      // Create an instance of the ServiceController
-      const serviceController = new ServiceController();
-
-      // Call the method being tested
-      try {
-        await serviceController.uploadService(serviceData, endpoint);
-      } catch (error) {
-        // Assertion
-        expect(error.message).toBe(errorMessage);
-      }
-
-      // Verify that Service.uploadService was called with the correct arguments
-      expect(Service.uploadService).toHaveBeenCalledWith(serviceData, endpoint);
-
-      // Restore the original method
-      Service.uploadService.mockRestore();
-    });
-  });
-});
-
-
-==== dockerfile
-
-# Use an official Node.js runtime as the base image
-FROM node:14
-
-# Set the working directory in the container
-WORKDIR /app
-
-# Copy the package.json and package-lock.json files to the container
-COPY package.json package-lock.json ./
-
-# Install the application dependencies
-RUN npm install --production
-
-# Copy the application source code to the container
-COPY src ./src
-COPY tests ./tests
-
-# Expose a port for the application (if needed)
-# EXPOSE 3000
-
-# Set the environment variables (if needed)
-# ENV NODE_ENV=production
-
-# Run the command to start the application
-CMD ["npm", "start"]
-
-
---- package.json
-
-{
-  "name": "your-app",
-  "version": "1.0.0",
-  "description": "Your application description",
-  "main": "src/app.js",
-  "scripts": {
-    "start": "node src/app.js",
-    "test": "jest"
-  },
-  "keywords": [],
-  "author": "Your Name",
-  "license": "MIT",
-  "dependencies": {
-    "express": "^4.17.1",
-    "joi": "^17.4.2",
-    "jsonwebtoken": "^8.5.1",
-    "request": "^2.88.2",
-    "request-promise-native": "^1.0.9",
-    "tar": "^6.1.0",
-    "unzipper": "^0.10.11"
-  },
-  "devDependencies": {
-    "jest": "^27.0.6",
-    "supertest": "^6.1.6"
-  }
 }
 
 
 
 
 
+OAuthService.java:
+
+package com.yourcompany.app.service;
+
+import com.yourcompany.app.config.AppConfiguration;
+import com.yourcompany.app.model.OAuthToken;
+import lombok.extern.slf4j.Slf4j;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.Form;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+@ApplicationScoped
+@Slf4j
+public class OAuthService {
+
+    @Inject
+    AppConfiguration appConfiguration;
+
+    public OAuthToken fetchAccessToken(String clientId, String clientSecret) {
+        String tokenEndpoint = appConfiguration.getOAuthTokenEndpoint();
+
+        // Create the REST client
+        Client client = ClientBuilder.newClient();
+
+        try {
+            // Build the token endpoint URL
+            String apiUrl = tokenEndpoint;
+
+            // Create the form data for the request
+            Form form = new Form();
+            form.param("grant_type", "client_credentials");
+            form.param("client_id", clientId);
+            form.param("client_secret", clientSecret);
+
+            // Send a POST request to the token endpoint
+            Response response = client.target(apiUrl)
+                    .request(MediaType.APPLICATION_JSON)
+                    .post(Entity.form(form));
+
+            // Check if the request was successful
+            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+                // Parse the response and extract the access token
+                OAuthToken token = response.readEntity(OAuthToken.class);
+                log.info("Access token fetched successfully");
+                return token;
+            } else {
+                log.error("Failed to fetch access token: {}", response.getStatusInfo().getReasonPhrase());
+            }
+        } catch (Exception e) {
+            log.error("Error occurred while fetching access token", e);
+        } finally {
+            // Close the REST client
+            client.close();
+        }
+
+        return null; // Return null if the token couldn't be fetched
+    }
+}
 
 
+ApiService.java:
+
+package com.yourcompany.app.service;
+
+import com.yourcompany.app.config.AppConfiguration;
+import lombok.extern.slf4j.Slf4j;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.ws.rs.client.Client;
+import javax.ws.rs.client.ClientBuilder;
+import javax.ws.rs.client.Entity;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+@ApplicationScoped
+@Slf4j
+public class ApiService {
+
+    @Inject
+    AppConfiguration appConfiguration;
+
+    public void uploadPayload(String payload, String apiEndpoint) {
+        String authToken = ""; // Fetch the authentication token here
+        
+        // Create the REST client
+        Client client = ClientBuilder.newClient();
+
+        try {
+            // Send a POST request to the API endpoint
+            Response response = client.target(apiEndpoint)
+                    .request(MediaType.APPLICATION_JSON)
+                    .header("Authorization", "Bearer " + authToken)
+                    .post(Entity.json(payload));
+
+            // Check if the request was successful
+            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+                log.info("Payload uploaded successfully");
+            } else {
+                log.error("Failed to upload payload: {}", response.getStatusInfo().getReasonPhrase());
+            }
+        } catch (Exception e) {
+            log.error("Error occurred while uploading payload", e);
+        } finally {
+            // Close the REST client
+            client.close();
+        }
+    }
+}
+}
+}
+
+CustomExceptionMapper.java:
+
+package com.yourcompany.app.exception;
+
+import javax.ws.rs.core.Response;
+import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
+
+@Provider
+public class CustomExceptionMapper implements ExceptionMapper<Exception> {
+
+    @Override
+    public Response toResponse(Exception exception) {
+        // Handle the exception and return the appropriate response
+        String errorMessage = "An error occurred";
+        
+        if (exception instanceof SomeSpecificException) {
+            // Handle a specific exception
+            errorMessage = "A specific error occurred";
+        }
+        
+        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                .entity(errorMessage)
+                .build();
+    }
+}
 
 
+ArchiveExtractor.java:
 
+package com.yourcompany.util;
+
+import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
+import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
+import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
+import org.apache.commons.compress.utils.IOUtils;
+
+import javax.enterprise.context.ApplicationScoped;
+import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+
+@ApplicationScoped
+public class ArchiveExtractor {
+
+    public void extractArchive(String filePath) {
+        String fileExtension = getFileExtension(filePath);
+
+        if ("zip".equalsIgnoreCase(fileExtension)) {
+            extractZipArchive(filePath);
+        } else if ("tar.gz".equalsIgnoreCase(fileExtension)) {
+            extractTarGzArchive(filePath);
+        } else {
+            // Unsupported archive format
+            throw new IllegalArgumentException("Unsupported archive format: " + fileExtension);
+        }
+    }
+
+    private String getFileExtension(String filePath) {
+        return filePath.substring(filePath.lastIndexOf(".") + 1);
+    }
+
+    private void extractZipArchive(String filePath) {
+        try (ZipInputStream zipInputStream = new ZipInputStream(Files.newInputStream(Path.of(filePath)))) {
+            ZipEntry entry;
+            while ((entry = zipInputStream.getNextEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    String extractedFileName = entry.getName();
+                    File extractedFile = new File(extractedFileName);
+                    Files.copy(zipInputStream, extractedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                zipInputStream.closeEntry();
+            }
+        } catch (IOException e) {
+            // Handle the exception accordingly
+            e.printStackTrace();
+        }
+    }
+
+    private void extractTarGzArchive(String filePath) {
+        try (InputStream fileInputStream = Files.newInputStream(Path.of(filePath));
+             BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+             GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(bufferedInputStream);
+             TarArchiveInputStream tarInputStream = new TarArchiveInputStream(gzipInputStream)) {
+
+            TarArchiveEntry entry;
+            while ((entry = tarInputStream.getNextTarEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    String extractedFileName = entry.getName();
+                    File extractedFile = new File(extractedFileName);
+                    FileOutputStream outputStream = new FileOutputStream(extractedFile);
+                    IOUtils.copy(tarInputStream, outputStream);
+                    outputStream.close();
+                }
+            }
+        } catch (IOException e) {
+            // Handle the exception accordingly
+            e.printStackTrace();
+        }
+    }
+}
+
+Logger.java
+
+package com.yourcompany.app.logger;
+
+import lombok.extern.slf4j.Slf4j;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
+
+@Slf4j
+public class Logger {
+    
+    public static void logMessage(String message, String level, String verbosity, String module) {
+        if (shouldLog(level, verbosity)) {
+            Map<String, Object> logEntry = createLogEntry(message, level, verbosity, module);
+
+            try {
+                String logMessage = LogFormatter.format(logEntry);
+                log.info(logMessage);
+            } catch (Exception e) {
+                log.error("Error converting log entry to JSON", e);
+            }
+        }
+    }
+
+    private static Map<String, Object> createLogEntry(String message, String level, String verbosity, String module) {
+        Map<String, Object> logEntry = new HashMap<>();
+        logEntry.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
+        logEntry.put("level", level);
+        logEntry.put("verbosity", verbosity);
+        logEntry.put("module", module);
+        logEntry.put("message", message);
+        return logEntry;
+    }
+
+    private static boolean shouldLog(String level, String verbosity) {
+        switch (verbosity) {
+            case "HIGH":
+                return true;
+            case "MEDIUM":
+                return level.equals("DEBUG") || level.equals("INFO");
+            case "LOW":
+                return level.equals("INFO");
+            default:
+                return true;
+        }
+    }
+}
+
+
+-------------gradle
+
+plugins {
+    id 'java'
+    id 'io.quarkus'
+    id 'org.owasp.dependencycheck' version '6.4.0'
+}
+
+group 'com.yourcompany'
+version '1.0.0'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'io.quarkus:quarkus-resteasy-jsonb:2.3.0.Final'
+    implementation 'io.quarkus:quarkus-junit5:2.3.0.Final'
+    implementation 'io.quarkus:quarkus-arc:2.3.0.Final'
+    implementation 'io.quarkus:quarkus-smallrye-jwt:2.3.0.Final'
+
+    implementation 'org.slf4j:slf4j-api:1.7.32' // SLF4J API
+    implementation 'org.slf4j:slf4j-simple:1.7.32' // SLF4J Simple implementation
+
+    // Add other dependencies as needed
+}
+
+dependencyCheck {
+    format = "HTML"
+}
+
+test {
+    useJUnitPlatform()
+}
+
+
+--------settings.gradle
+rootProject.name = 'your-app-name'
 
