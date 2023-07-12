@@ -735,52 +735,44 @@ Logger.java
 
 package com.yourcompany.app.logger;
 
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.LoggerFactory;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
-
-@Slf4j
 public class Logger {
-    
+
+    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(Logger.class);
+
     public static void logMessage(String message, String level, String verbosity, String module) {
-        if (shouldLog(level, verbosity)) {
-            Map<String, Object> logEntry = createLogEntry(message, level, verbosity, module);
+        String formattedMessage = String.format("{ timestamp: %s, LEVEL: %s, VERBOSITY: %s, MODULE: %s, %s }",
+                java.time.LocalDateTime.now(), level, verbosity, module, message);
 
-            try {
-                String logMessage = LogFormatter.format(logEntry);
-                log.info(logMessage);
-            } catch (Exception e) {
-                log.error("Error converting log entry to JSON", e);
-            }
-        }
-    }
-
-    private static Map<String, Object> createLogEntry(String message, String level, String verbosity, String module) {
-        Map<String, Object> logEntry = new HashMap<>();
-        logEntry.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
-        logEntry.put("level", level);
-        logEntry.put("verbosity", verbosity);
-        logEntry.put("module", module);
-        logEntry.put("message", message);
-        return logEntry;
-    }
-
-    private static boolean shouldLog(String level, String verbosity) {
-        switch (verbosity) {
-            case "HIGH":
-                return true;
-            case "MEDIUM":
-                return level.equals("DEBUG") || level.equals("INFO");
-            case "LOW":
-                return level.equals("INFO");
+        switch (level.toUpperCase()) {
+            case "DEBUG":
+                if (verbosity.equalsIgnoreCase("HIGH")) {
+                    LOG.debug(formattedMessage);
+                }
+                break;
+            case "INFO":
+                if (verbosity.equalsIgnoreCase("HIGH") || verbosity.equalsIgnoreCase("MEDIUM")) {
+                    LOG.info(formattedMessage);
+                }
+                break;
+            case "WARN":
+                if (verbosity.equalsIgnoreCase("HIGH") || verbosity.equalsIgnoreCase("MEDIUM")) {
+                    LOG.warn(formattedMessage);
+                }
+                break;
+            case "ERROR":
+                if (verbosity.equalsIgnoreCase("HIGH") || verbosity.equalsIgnoreCase("MEDIUM")) {
+                    LOG.error(formattedMessage);
+                }
+                break;
             default:
-                return true;
+                LOG.info(formattedMessage);
+                break;
         }
     }
 }
+
 
 
 -------------gradle
