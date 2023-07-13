@@ -342,33 +342,29 @@ public class OAuthToken {
     private int expiresIn;
 }
 
-ArtifactoryService.java:
-
 package com.yourcompany.app.service;
 
 import com.yourcompany.app.config.AppConfiguration;
 import com.yourcompany.app.logger.Logger;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.conn.ssl.NoopHostnameVerifier;
+import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.ssl.SSLContextBuilder;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLParameters;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Invocation;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.GeneralSecurityException;
-import java.security.KeyStore;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
 
 @ApplicationScoped
 @Slf4j
@@ -381,6 +377,7 @@ public class ArtifactoryService {
         String username = System.getenv("ARTIFACTORY_USERNAME");
         String apiKey = System.getenv("ARTIFACTORY_API_KEY");
         String certificatePath = System.getenv("ARTIFACTORY_CERTIFICATE_PATH");
+        String intermediateCertificatePath = System.getenv("ARTIFACTORY_INTERMEDIATE_CERTIFICATE_PATH");
 
         String artifactoryUrl;
         if ("DEV".equalsIgnoreCase(System.getenv("ENVIRONMENT"))) {
@@ -389,51 +386,50 @@ public class ArtifactoryService {
             artifactoryUrl = appConfiguration.getProdArtifactoryUrl();
         }
 
-        // Create the REST client with SSLContext
-        Client client = createSSLClient(certificatePath);
-
         try {
+            HttpClient httpClient = createSSLClient(certificatePath, intermediateCertificatePath);
+
             // Build the Artifactory API URL
             String apiUrl = artifactoryUrl + "/path/to/file";
 
-            // Send a GET request to the Artifactory API
-            Invocation.Builder builder = client.target(apiUrl)
-                    .request(MediaType.APPLICATION_OCTET_STREAM)
-                    .header("X-JFrog-Art-Api", apiKey)
-                    .header("Authorization", "Bearer " + getAuthToken(username, apiKey));
+            // Create the GET request
+            HttpGet request = new HttpGet(apiUrl);
+            request.addHeader("X-JFrog-Art-Api", apiKey);
+            request.addHeader("Authorization", "Bearer " + getAuthToken(username, apiKey));
 
-            Response response = builder.get();
+            // Execute the request
+            HttpResponse response = httpClient.execute(request);
 
             // Check if the request was successful
-            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
-                // Get the input stream from the response
-                InputStream inputStream = response.readEntity(InputStream.class);
+            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                HttpEntity entity = response.getEntity();
+                if (entity != null) {
+                    // Get the input stream from the response
+                    InputStream inputStream = entity.getContent();
 
-                // Create the output file
-                String outputFile = "path/to/output/file";
-                OutputStream outputStream = new FileOutputStream(outputFile);
+                    // Create the output file
+                    String outputFile = "path/to/output/file";
+                    OutputStream outputStream = new FileOutputStream(outputFile);
 
-                // Copy the input stream to the output file
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
+                    // Copy the input stream to the output file
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                        outputStream.write(buffer, 0, bytesRead);
+                    }
+
+                    // Close the input and output streams
+                    inputStream.close();
+                    outputStream.close();
+
+                    Logger.logMessage("File downloaded from Artifactory", "INFO", "HIGH", "ArtifactoryService");
                 }
-
-                // Close the input and output streams
-                inputStream.close();
-                outputStream.close();
-
-                Logger.logMessage("File downloaded from Artifactory", "INFO", "HIGH", "ArtifactoryService");
             } else {
-                Logger.logMessage("Failed to download file from Artifactory: " + response.getStatusInfo().getReasonPhrase(), "ERROR", "HIGH", "ArtifactoryService");
+                Logger.logMessage("Failed to download file from Artifactory: " + response.getStatusLine().getReasonPhrase(), "ERROR", "HIGH", "ArtifactoryService");
             }
-        } catch (IOException e) {
+        } catch (IOException | GeneralSecurityException e) {
             Logger.logMessage("Error occurred while downloading file from Artifactory", "ERROR", "HIGH", "ArtifactoryService");
             log.error("Error occurred while downloading file from Artifactory", e);
-        } finally {
-            // Close the REST client
-            client.close();
         }
     }
 
@@ -447,60 +443,53 @@ public class ArtifactoryService {
         String authEndpoint = "https://artifactory.example.com/api/auth";
 
         // Create the REST client
-        Client client = ClientBuilder.newClient();
+        HttpClient httpClient = HttpClients.createDefault();
 
         try {
             // Build the authentication API URL
             String apiUrl = authEndpoint + "?username=" + username + "&apiKey=" + apiKey;
 
-            // Send a GET request to the authentication API
-            Response response = client.target(apiUrl)
-                    .request(MediaType.APPLICATION_JSON)
-                    .get();
+            // Create the GET request
+            HttpGet request = new HttpGet(apiUrl);
+
+            // Execute the request
+            HttpResponse response = httpClient.execute(request);
 
             // Check if the request was successful
-            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
                 // Parse the response and extract the authentication token
-                JsonObject jsonResponse = response.readEntity(JsonObject.class);
-                String authToken = jsonResponse.getString("token");
-
+                // ...
                 Logger.logMessage("Authentication token fetched successfully", "INFO", "HIGH", "ArtifactoryService");
 
-                return authToken;
+                return ""; // Return the fetched token
             } else {
-                Logger.logMessage("Failed to fetch authentication token: " + response.getStatusInfo().getReasonPhrase(), "ERROR", "HIGH", "ArtifactoryService");
+                Logger.logMessage("Failed to fetch authentication token: " + response.getStatusLine().getReasonPhrase(), "ERROR", "HIGH", "ArtifactoryService");
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             Logger.logMessage("Error occurred while fetching authentication token", "ERROR", "HIGH", "ArtifactoryService");
             log.error("Error occurred while fetching authentication token", e);
-        } finally {
-            // Close the REST client
-            client.close();
         }
 
         return ""; // Return an empty string if the token couldn't be fetched
     }
 
-    private Client createSSLClient(String certificatePath) {
-        try {
-            KeyStore keyStore = KeyStore.getInstance("PKCS12");
-            keyStore.load(getClass().getClassLoader().getResourceAsStream(certificatePath), "password".toCharArray());
+    private HttpClient createSSLClient(String certificatePath, String intermediateCertificatePath) throws IOException, GeneralSecurityException {
+        SSLContext sslContext = SSLContextBuilder.create()
+                .loadTrustMaterial(new java.io.File(certificatePath), "password".toCharArray())
+                .loadKeyMaterial(new java.io.File(certificatePath), "password".toCharArray(), "password".toCharArray())
+                .loadTrustMaterial(new java.io.File(intermediateCertificatePath))
+                .build();
 
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, null, null);
-            SSLParameters sslParameters = sslContext.getDefaultSSLParameters();
-            sslParameters.setNeedClientAuth(true);
-            sslParameters.setKeyStore(keyStore);
+        SSLConnectionSocketFactory socketFactory = new SSLConnectionSocketFactory(
+                sslContext,
+                new String[]{"TLSv1.2"},
+                null,
+                new NoopHostnameVerifier()
+        );
 
-            return ClientBuilder.newBuilder()
-                    .sslContext(sslContext)
-                    .sslParameters(sslParameters)
-                    .build();
-        } catch (IOException | GeneralSecurityException e) {
-            Logger.logMessage("Error occurred while creating SSL client", "ERROR", "HIGH", "ArtifactoryService");
-            log.error("Error occurred while creating SSL client", e);
-            return null;
-        }
+        return HttpClients.custom()
+                .setSSLSocketFactory(socketFactory)
+                .build();
     }
 }
 
@@ -508,22 +497,28 @@ public class ArtifactoryService {
 
 
 
-OAuthService.java:
-
 package com.yourcompany.app.service;
 
 import com.yourcompany.app.config.AppConfiguration;
 import com.yourcompany.app.model.OAuthToken;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.NameValuePair;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.entity.UrlEncodedFormEntity;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.message.BasicNameValuePair;
+import org.apache.http.util.EntityUtils;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
-import javax.ws.rs.core.Form;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 @ApplicationScoped
 @Slf4j
@@ -535,59 +530,74 @@ public class OAuthService {
     public OAuthToken fetchAccessToken(String clientId, String clientSecret) {
         String tokenEndpoint = appConfiguration.getOAuthTokenEndpoint();
 
-        // Create the REST client
-        Client client = ClientBuilder.newClient();
-
         try {
+            HttpClient httpClient = HttpClients.createDefault();
+
             // Build the token endpoint URL
             String apiUrl = tokenEndpoint;
 
             // Create the form data for the request
-            Form form = new Form();
-            form.param("grant_type", "client_credentials");
-            form.param("client_id", clientId);
-            form.param("client_secret", clientSecret);
+            List<NameValuePair> formParams = new ArrayList<>();
+            formParams.add(new BasicNameValuePair("grant_type", "client_credentials"));
+            formParams.add(new BasicNameValuePair("client_id", clientId));
+            formParams.add(new BasicNameValuePair("client_secret", clientSecret));
+            UrlEncodedFormEntity entity = new UrlEncodedFormEntity(formParams);
 
-            // Send a POST request to the token endpoint
-            Response response = client.target(apiUrl)
-                    .request(MediaType.APPLICATION_JSON)
-                    .post(Entity.form(form));
+            // Create the POST request
+            HttpPost request = new HttpPost(apiUrl);
+            request.setEntity(entity);
+            request.setHeader("Content-Type", ContentType.APPLICATION_FORM_URLENCODED.getMimeType());
+
+            // Execute the request
+            HttpResponse response = httpClient.execute(request);
 
             // Check if the request was successful
-            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+            if (response.getStatusLine().getStatusCode() == HttpStatus.SC_OK) {
+                String responseBody = EntityUtils.toString(response.getEntity());
                 // Parse the response and extract the access token
-                OAuthToken token = response.readEntity(OAuthToken.class);
+                OAuthToken token = parseAccessToken(responseBody);
                 log.info("Access token fetched successfully");
                 return token;
             } else {
-                log.error("Failed to fetch access token: {}", response.getStatusInfo().getReasonPhrase());
+                log.error("Failed to fetch access token: {}", response.getStatusLine().getReasonPhrase());
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Error occurred while fetching access token", e);
-        } finally {
-            // Close the REST client
-            client.close();
         }
 
         return null; // Return null if the token couldn't be fetched
     }
+
+private OAuthToken parseAccessToken(String responseBody) {
+    // Parse the response body and extract the access token
+    JsonObject json = Json.createReader(new StringReader(responseBody)).readObject();
+    String accessToken = json.getString("access_token");
+    String tokenType = json.getString("token_type");
+    int expiresIn = json.getInt("expires_in");
+
+    // Create and return the OAuthToken object
+    return new OAuthToken(accessToken, tokenType, expiresIn);
 }
 
+}
 
-ApiService.java:
-
-package com.yourcompany.app.service;
+ApiService.java
 
 import com.yourcompany.app.config.AppConfiguration;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.ws.rs.client.Client;
-import javax.ws.rs.client.ClientBuilder;
-import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import java.io.IOException;
 
 @ApplicationScoped
 @Slf4j
@@ -598,33 +608,44 @@ public class ApiService {
 
     public void uploadPayload(String payload, String apiEndpoint) {
         String authToken = ""; // Fetch the authentication token here
-        
-        // Create the REST client
-        Client client = ClientBuilder.newClient();
+
+        // Create the HttpClient
+        HttpClient httpClient = HttpClients.createDefault();
 
         try {
-            // Send a POST request to the API endpoint
-            Response response = client.target(apiEndpoint)
-                    .request(MediaType.APPLICATION_JSON)
-                    .header("Authorization", "Bearer " + authToken)
-                    .post(Entity.json(payload));
+            // Create the HTTP POST request
+            HttpPost httpPost = new HttpPost(apiEndpoint);
+
+            // Set the request headers
+            httpPost.setHeader("Content-Type", MediaType.APPLICATION_JSON);
+            httpPost.setHeader("Authorization", "Bearer " + authToken);
+
+            // Set the request body
+            StringEntity requestEntity = new StringEntity(payload);
+            httpPost.setEntity(requestEntity);
+
+            // Execute the request
+            HttpResponse httpResponse = httpClient.execute(httpPost);
+
+            // Get the response status code
+            int statusCode = httpResponse.getStatusLine().getStatusCode();
+
+            // Read the response body
+            HttpEntity responseEntity = httpResponse.getEntity();
+            String responseBody = EntityUtils.toString(responseEntity);
 
             // Check if the request was successful
-            if (response.getStatus() == Response.Status.OK.getStatusCode()) {
+            if (statusCode == Response.Status.OK.getStatusCode()) {
                 log.info("Payload uploaded successfully");
             } else {
-                log.error("Failed to upload payload: {}", response.getStatusInfo().getReasonPhrase());
+                log.error("Failed to upload payload: {}", statusCode);
             }
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("Error occurred while uploading payload", e);
-        } finally {
-            // Close the REST client
-            client.close();
         }
     }
 }
-}
-}
+
 
 CustomExceptionMapper.java:
 
