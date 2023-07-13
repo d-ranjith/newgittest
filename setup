@@ -64,45 +64,62 @@ Copy code
 package com.yourcompany.app.service;
 
 import com.yourcompany.app.config.AppConfiguration;
+import com.yourcompany.app.logger.Logger;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpUriRequest;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-import static org.mockito.Mockito.*;
+import java.io.IOException;
 
-class ArtifactoryServiceTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-    @Mock
+public class ArtifactoryServiceTest {
+
     private AppConfiguration appConfiguration;
-
-    @InjectMocks
     private ArtifactoryService artifactoryService;
 
     @BeforeEach
-    void setup() {
-        MockitoAnnotations.openMocks(this);
+    public void setup() {
+        appConfiguration = mock(AppConfiguration.class);
+        artifactoryService = new ArtifactoryService(appConfiguration);
     }
 
     @Test
-    void testDownloadFileFromArtifactory() {
-        // Mock the required dependencies
-        String username = "testUser";
-        String apiKey = "testApiKey";
-        String certificatePath = "testCertificatePath";
-        when(appConfiguration.getArtifactoryUsername()).thenReturn(username);
-        when(appConfiguration.getArtifactoryApiKey()).thenReturn(apiKey);
-        when(appConfiguration.getArtifactoryCertificatePath()).thenReturn(certificatePath);
+    public void testDownloadFileFromArtifactory() throws IOException {
+        // Mock the app configuration
+        when(appConfiguration.getDevArtifactoryUrl()).thenReturn("http://localhost:8081/artifactory");
+        when(appConfiguration.getProdArtifactoryUrl()).thenReturn("https://artifactory.example.com");
 
-        // Add your test logic here to verify the behavior of the downloadFileFromArtifactory method
-    }
+        // Mock the HTTP client and response
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse httpResponse = mock(HttpResponse.class);
+        HttpEntity httpEntity = new StringEntity("Test file content", ContentType.TEXT_PLAIN);
 
-    @Test
-    void testGetFileSize() {
-        // Mock the required dependencies
+        // Mock the HTTP GET request
+        HttpUriRequest httpRequest = new HttpGet("http://localhost:8081/artifactory/path/to/file");
 
-        // Add your test logic here to verify the behavior of the getFileSize method
+        // Mock the HTTP client behavior
+        when(httpClient.execute(httpRequest)).thenReturn(httpResponse);
+        when(httpResponse.getEntity()).thenReturn(httpEntity);
+
+        // Set the mocked HTTP client
+        artifactoryService.setHttpClient(httpClient);
+
+        // Call the method under test
+        String result = artifactoryService.downloadFileFromArtifactory();
+
+        // Verify the result
+        assertEquals("Test file content", result);
     }
 }
 OAuthServiceTest.java:
@@ -112,37 +129,59 @@ Copy code
 package com.yourcompany.app.service;
 
 import com.yourcompany.app.config.AppConfiguration;
-import com.yourcompany.app.model.OAuthToken;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-import static org.mockito.Mockito.*;
+import java.io.IOException;
 
-class OAuthServiceTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-    @Mock
+public class OAuthServiceTest {
+
     private AppConfiguration appConfiguration;
-
-    @InjectMocks
     private OAuthService oauthService;
 
     @BeforeEach
-    void setup() {
-        MockitoAnnotations.openMocks(this);
+    public void setup() {
+        appConfiguration = mock(AppConfiguration.class);
+        oauthService = new OAuthService(appConfiguration);
     }
 
     @Test
-    void testFetchAccessToken() {
-        // Mock the required dependencies
-        String clientId = "testClientId";
-        String clientSecret = "testClientSecret";
-        when(appConfiguration.getOauthClientId()).thenReturn(clientId);
-        when(appConfiguration.getOauthClientSecret()).thenReturn(clientSecret);
+    public void testFetchAccessToken() throws IOException {
+        // Mock the app configuration
+        when(appConfiguration.getOAuthTokenEndpoint()).thenReturn("https://oauth.example.com/token");
 
-        // Add your test logic here to verify the behavior of the fetchAccessToken method
+        // Mock the HTTP client and response
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse httpResponse = mock(HttpResponse.class);
+        HttpEntity httpEntity = new StringEntity("{\"access_token\":\"test-token\",\"expires_in\":3600}", ContentType.APPLICATION_JSON);
+
+        // Mock the HTTP POST request
+        HttpPost httpPost = new HttpPost("https://oauth.example.com/token");
+
+        // Mock the HTTP client behavior
+        when(httpClient.execute(httpPost)).thenReturn(httpResponse);
+        when(httpResponse.getEntity()).thenReturn(httpEntity);
+
+        // Set the mocked HTTP client
+        oauthService.setHttpClient(httpClient);
+
+        // Call the method under test
+        String result = oauthService.fetchAccessToken("clientId", "clientSecret");
+
+        // Verify the result
+        assertEquals("test-token", result);
     }
 }
 ApiServiceTest.java:
@@ -152,37 +191,60 @@ Copy code
 package com.yourcompany.app.service;
 
 import com.yourcompany.app.config.AppConfiguration;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.ContentType;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClientBuilder;
+import org.apache.http.util.EntityUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-import static org.mockito.Mockito.*;
+import java.io.IOException;
 
-class ApiServiceTest {
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-    @Mock
+public class ApiServiceTest {
+
     private AppConfiguration appConfiguration;
-
-    @InjectMocks
     private ApiService apiService;
 
     @BeforeEach
-    void setup() {
-        MockitoAnnotations.openMocks(this);
+    public void setup() {
+        appConfiguration = mock(AppConfiguration.class);
+        apiService = new ApiService(appConfiguration);
     }
 
     @Test
-    void testUploadPayload() {
-        // Mock the required dependencies
-        String apiEndpoint = "testApiEndpoint";
-        when(appConfiguration.getApiEndpoint()).thenReturn(apiEndpoint);
+    public void testUploadPayload() throws IOException {
+        // Mock the app configuration
+        when(appConfiguration.getApiEndpoint()).thenReturn("https://api.example.com");
 
-        // Add your test logic here to verify the behavior of the uploadPayload method
+        // Mock the HTTP client and response
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse httpResponse = mock(HttpResponse.class);
+        HttpEntity httpEntity = new StringEntity("Success", ContentType.TEXT_PLAIN);
+
+        // Mock the HTTP POST request
+        HttpPost httpPost = new HttpPost("https://api.example.com");
+
+        // Mock the HTTP client behavior
+        when(httpClient.execute(httpPost)).thenReturn(httpResponse);
+        when(httpResponse.getEntity()).thenReturn(httpEntity);
+
+        // Set the mocked HTTP client
+        apiService.setHttpClient(httpClient);
+
+        // Call the method under test
+        apiService.uploadPayload("Test payload", "https://api.example.com");
+
+        // No assertion for this test case, only verifying that the method doesn't throw any exceptions
     }
 }
-
 
 ---------------------------------
 
@@ -595,8 +657,6 @@ import org.apache.http.util.EntityUtils;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
-import javax.ws.rs.core.MediaType;
-import javax.ws.rs.core.Response;
 import java.io.IOException;
 
 @ApplicationScoped
@@ -617,7 +677,7 @@ public class ApiService {
             HttpPost httpPost = new HttpPost(apiEndpoint);
 
             // Set the request headers
-            httpPost.setHeader("Content-Type", MediaType.APPLICATION_JSON);
+            httpPost.setHeader("Content-Type", "application/json");
             httpPost.setHeader("Authorization", "Bearer " + authToken);
 
             // Set the request body
@@ -635,7 +695,7 @@ public class ApiService {
             String responseBody = EntityUtils.toString(responseEntity);
 
             // Check if the request was successful
-            if (statusCode == Response.Status.OK.getStatusCode()) {
+            if (statusCode == 200) {
                 log.info("Payload uploaded successfully");
             } else {
                 log.error("Failed to upload payload: {}", statusCode);
@@ -647,32 +707,65 @@ public class ApiService {
 }
 
 
+
 CustomExceptionMapper.java:
 
 package com.yourcompany.app.exception;
 
-import javax.ws.rs.core.Response;
-import javax.ws.rs.ext.ExceptionMapper;
-import javax.ws.rs.ext.Provider;
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
-@Provider
-public class CustomExceptionMapper implements ExceptionMapper<Exception> {
+import java.io.IOException;
 
-    @Override
-    public Response toResponse(Exception exception) {
+public class CustomExceptionMapper {
+
+    public CloseableHttpResponse toResponse(Exception exception) {
         // Handle the exception and return the appropriate response
         String errorMessage = "An error occurred";
-        
+
         if (exception instanceof SomeSpecificException) {
             // Handle a specific exception
             errorMessage = "A specific error occurred";
         }
-        
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(errorMessage)
-                .build();
+
+        // Create the HttpClient
+        CloseableHttpClient httpClient = HttpClients.createDefault();
+
+        try {
+            // Create the HTTP POST request
+            HttpPost httpPost = new HttpPost("http://example.com/api/endpoint");
+
+            // Set the request headers
+            httpPost.setHeader("Content-Type", "application/json");
+
+            // Set the request body
+            StringEntity requestEntity = new StringEntity(errorMessage);
+            httpPost.setEntity(requestEntity);
+
+            // Execute the request
+            CloseableHttpResponse response = httpClient.execute(httpPost);
+
+            return response;
+        } catch (IOException e) {
+            // Handle the exception
+        } finally {
+            // Close the HttpClient
+            try {
+                httpClient.close();
+            } catch (IOException e) {
+                // Handle the exception
+            }
+        }
+
+        return null;
     }
 }
+
 
 
 ArchiveExtractor.java:
