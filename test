@@ -1,10 +1,14 @@
-import javax.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+
+@ApplicationScoped
 public interface AppConfiguration {
+
     @Inject
-    @ConfigProperty(name = "app.api.endpoint")
-    String getApiEndpoint();
+    @ConfigProperty(name = "app.environment")
+    String getEnvironment();
 
     @Inject
     @ConfigProperty(name = "app.artifactory.username")
@@ -14,13 +18,170 @@ public interface AppConfiguration {
     @ConfigProperty(name = "app.artifactory.apikey")
     String getArtifactoryApiKey();
 
-    // ... other properties
+    @Inject
+    @ConfigProperty(name = "app.artifactory.cert.path")
+    String getArtifactoryCertificatePath();
 
     @Inject
-    @ConfigProperty(name = "app.oauth.client.id")
-    String getOauthClientId();
+    @ConfigProperty(name = "app.artifactory.base.url")
+    String getArtifactoryBaseUrl();
 
     @Inject
-    @ConfigProperty(name = "app.oauth.client.secret")
-    String getOauthClientSecret();
+    @ConfigProperty(name = "app.download.dir")
+    String getDownloadDirectory();
+
+    @Inject
+    @ConfigProperty(name = "app.extract.dir")
+    String getExtractDirectory();
+
+    @Inject
+    @ConfigProperty(name = "app.api.username")
+    String getApiUsername();
+
+    @Inject
+    @ConfigProperty(name = "app.api.password")
+    String getApiPassword();
+
+    @Inject
+    @ConfigProperty(name = "app.api.url")
+    String getApiUrl();
+
+    @Inject
+    @ConfigProperty(name = "app.use.cert")
+    Boolean useCertificate();
+
+    @Inject
+    @ConfigProperty(name = "app.use.mock")
+    Boolean useMock();
+
+    @Inject
+    @ConfigProperty(name = "app.json.logging")
+    Boolean enableJsonLogging();
+
+    @Inject
+    @ConfigProperty(name = "lse.csiid")
+    String getLseCsiid();
+
+    @Inject
+    @ConfigProperty(name = "lse.environment.class")
+    String getLseEnvironmentClass();
+
+    @Inject
+    @ConfigProperty(name = "lse.environment.name")
+    String getLseEnvironmentName();
+
+    @Inject
+    @ConfigProperty(name = "lse.project.name")
+    String getLseProjectName();
+
+    @Inject
+    @ConfigProperty(name = "lse.vault.env")
+    String getLseVaultEnvironment();
+
+    @Inject
+    @ConfigProperty(name = "lse.k8s.cluster")
+    String getLseK8sCluster();
+
+    @Inject
+    @ConfigProperty(name = "lse.pipeline.name")
+    String getLsePipelineName();
+
+    @Inject
+    @ConfigProperty(name = "lse.build.version")
+    String getLseBuildVersion();
+
+    @Inject
+    @ConfigProperty(name = "lse.sector.name")
+    String getLseSectorName();
+
+    @Inject
+    @ConfigProperty(name = "lse.prod.artifactory.branches", defaultValue = "master,release")
+    String[] getLseProdArtifactoryBranches();
+
+    @Inject
+    @ConfigProperty(name = "coin.base.url")
+    String getCoinBaseUrl();
+
+    @Inject
+    @ConfigProperty(name = "coin.jwks.endpoint")
+    String getCoinJwksEndpoint();
+
+    @Inject
+    @ConfigProperty(name = "coin.client.id")
+    String getCoinClientId();
+
+    @Inject
+    @ConfigProperty(name = "coin.client.secret")
+    String getCoinClientSecret();
+
+    @Inject
+    @ConfigProperty(name = "coin.universal.identity.url")
+    String getCoinUniversalIdentityUrl();
+
+    @Inject
+    @ConfigProperty(name = "coin.universal.identity.endpoint")
+    String getCoinUniversalIdentityEndpoint();
+
+    @Inject
+    @ConfigProperty(name = "coin.extra.ca.certs")
+    String getCoinExtraCaCertificates();
+
+}
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+@Singleton
+public class App {
+
+    private static final Logger log = LoggerFactory.getLogger(App.class);
+
+    @Inject
+    AppConfiguration appConfiguration;
+
+    public void run() {
+        String environment = appConfiguration.getEnvironment();
+        String artifactoryUsername = appConfiguration.getArtifactoryUsername();
+        String artifactoryApiKey = appConfiguration.getArtifactoryApiKey();
+        String artifactoryCertificatePath = appConfiguration.getArtifactoryCertificatePath();
+        String artifactoryBaseUrl = appConfiguration.getArtifactoryBaseUrl();
+        String downloadDirectory = appConfiguration.getDownloadDirectory();
+        String extractDirectory = appConfiguration.getExtractDirectory();
+        String apiUsername = appConfiguration.getApiUsername();
+        String apiPassword = appConfiguration.getApiPassword();
+        String apiUrl = appConfiguration.getApiUrl();
+        Boolean useCertificate = appConfiguration.useCertificate();
+        Boolean useMock = appConfiguration.useMock();
+        Boolean enableJsonLogging = appConfiguration.enableJsonLogging();
+        String lseCsiid = appConfiguration.getLseCsiid();
+        String lseEnvironmentClass = appConfiguration.getLseEnvironmentClass();
+        String lseEnvironmentName = appConfiguration.getLseEnvironmentName();
+        String lseProjectName = appConfiguration.getLseProjectName();
+        String lseVaultEnvironment = appConfiguration.getLseVaultEnvironment();
+        String lseK8sCluster = appConfiguration.getLseK8sCluster();
+        String lsePipelineName = appConfiguration.getLsePipelineName();
+        String lseBuildVersion = appConfiguration.getLseBuildVersion();
+        String lseSectorName = appConfiguration.getLseSectorName();
+        String[] lseProdArtifactoryBranches = appConfiguration.getLseProdArtifactoryBranches();
+        String coinBaseUrl = appConfiguration.getCoinBaseUrl();
+        String coinJwksEndpoint = appConfiguration.getCoinJwksEndpoint();
+        String coinClientId = appConfiguration.getCoinClientId();
+        String coinClientSecret = appConfiguration.getCoinClientSecret();
+        String coinUniversalIdentityUrl = appConfiguration.getCoinUniversalIdentityUrl();
+        String coinUniversalIdentityEndpoint = appConfiguration.getCoinUniversalIdentityEndpoint();
+        String coinExtraCaCertificates = appConfiguration.getCoinExtraCaCertificates();
+
+        // Use the configuration values as needed
+        // ...
+
+        log.info("Application started");
+    }
+
+    public static void main(String[] args) {
+        App app = new App();
+        app.run();
+    }
 }
