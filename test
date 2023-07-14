@@ -1,30 +1,36 @@
-import lombok.Data;
+import io.smallrye.config.ConfigDefault;
+import io.smallrye.config.ConfigMapping;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import javax.inject.Singleton;
 
-import javax.enterprise.context.ApplicationScoped;
-
-@Data
+@Getter
 @NoArgsConstructor
-@ApplicationScoped
-public class AppConfiguration {
+@Singleton
+@ConfigMapping(prefix = "app")
+public interface AppConfiguration {
 
-    private String apiEndpoint;
-    private String artifactoryUsername;
-    // Add other configuration fields
+    @ConfigDefault("default-api-endpoint")
+    String apiEndpoint();
 
-    public AppConfiguration(String apiEndpoint, String artifactoryUsername, /* Add other fields */) {
-        this.apiEndpoint = apiEndpoint != null ? apiEndpoint : "default_api_endpoint";
-        this.artifactoryUsername = artifactoryUsername != null ? artifactoryUsername : "default_artifactory_username";
-        // Initialize other configuration fields with default values
-    }
+    @ConfigDefault("default-artifactory-username")
+    String artifactoryUsername();
 
-    public static AppConfiguration fromEnvVariables() {
-        String apiEndpoint = System.getenv().getOrDefault("APP_API_ENDPOINT", null);
-        String artifactoryUsername = System.getenv().getOrDefault("APP_ARTIFACTORY_USERNAME", null);
-        // Get other environment variables with default values
+    @ConfigDefault("default-artifactory-apikey")
+    String artifactoryApiKey();
 
-        return new AppConfiguration(apiEndpoint, artifactoryUsername, /* Other fields */);
-    }
+    @ConfigDefault("default-artifactory-certificate-path")
+    String artifactoryCertificatePath();
 
-    // Add other methods and getters/setters as needed
+    @ConfigDefault("default-oauth-client-id")
+    String oauthClientId();
+
+    @ConfigDefault("default-oauth-client-secret")
+    String oauthClientSecret();
 }
+
+
+implementation 'io.smallrye:smallrye-config:2.0.0'
+implementation 'io.smallrye:smallrye-config-common:2.0.0'
+implementation 'org.eclipse.microprofile.config:microprofile-config-api:2.0'
+annotationProcessor 'org.projectlombok:lombok:1.18.20'
