@@ -30,192 +30,33 @@ coin.universal.identity.url
 coin.universal.identity.endpoint
 coin.extra.ca.certs
 
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-
-import javax.enterprise.context.ApplicationScoped;
-import javax.inject.Inject;
-import java.util.Arrays;
-import java.util.List;
-
-@ApplicationScoped
-public interface AppConfiguration {
-
-    @Inject
-    @ConfigProperty(name = "app.environment", defaultValue = "development")
-    String getEnvironment();
-
-    @Inject
-    @ConfigProperty(name = "app.artifactory.username", defaultValue = "admin")
-    String getArtifactoryUsername();
-
-    @Inject
-    @ConfigProperty(name = "app.artifactory.apikey", defaultValue = "")
-    String getArtifactoryApiKey();
-
-    @Inject
-    @ConfigProperty(name = "app.artifactory.cert.path", defaultValue = "")
-    String getArtifactoryCertificatePath();
-
-    @Inject
-    @ConfigProperty(name = "app.artifactory.base.url", defaultValue = "")
-    String getArtifactoryBaseUrl();
-
-    @Inject
-    @ConfigProperty(name = "app.download.dir", defaultValue = "")
-    String getDownloadDirectory();
-
-    @Inject
-    @ConfigProperty(name = "app.extract.dir", defaultValue = "")
-    String getExtractDirectory();
-
-    @Inject
-    @ConfigProperty(name = "app.api.username", defaultValue = "")
-    String getApiUsername();
-
-    @Inject
-    @ConfigProperty(name = "app.api.password", defaultValue = "")
-    String getApiPassword();
-
-    @Inject
-    @ConfigProperty(name = "app.api.url", defaultValue = "")
-    String getApiUrl();
-
-    @Inject
-    @ConfigProperty(name = "app.use.cert", defaultValue = "")
-    boolean useCertificate();
-
-    @Inject
-    @ConfigProperty(name = "app.use.mock", defaultValue = "")
-    boolean useMock();
-
-    @Inject
-    @ConfigProperty(name = "app.json.logging", defaultValue = "")
-    boolean enableJsonLogging();
-
-    @Inject
-    @ConfigProperty(name = "lse.csiid", defaultValue = "")
-    String getLseCsiid();
-
-    @Inject
-    @ConfigProperty(name = "lse.environment.class", defaultValue = "")
-    String getLseEnvironmentClass();
-
-    @Inject
-    @ConfigProperty(name = "lse.environment.name", defaultValue = "")
-    String getLseEnvironmentName();
-
-    @Inject
-    @ConfigProperty(name = "lse.project.name", defaultValue = "")
-    String getLseProjectName();
-
-    @Inject
-    @ConfigProperty(name = "lse.vault.env", defaultValue = "")
-    String getLseVaultEnvironment();
-
-    @Inject
-    @ConfigProperty(name = "lse.k8s.cluster", defaultValue = "")
-    String getLseKubernetesCluster();
-
-    @Inject
-    @ConfigProperty(name = "lse.pipeline.name", defaultValue = "")
-    String getLsePipelineName();
-
-    @Inject
-    @ConfigProperty(name = "lse.build.version", defaultValue = "")
-    String getLseBuildVersion();
-
-    @Inject
-    @ConfigProperty(name = "lse.sector.name", defaultValue = "")
-    String getLseSectorName();
-
-    @Inject
-    @ConfigProperty(name = "lse.prod.artifactory.branches", defaultValue = "master,release")
-    List<String> getLseProdArtifactoryBranches();
-
-    @Inject
-    @ConfigProperty(name = "coin.base.url", defaultValue = "")
-    String getCoinBaseUrl();
-
-    @Inject
-    @ConfigProperty(name = "coin.jwks.endpoint", defaultValue = "")
-    String getCoinJwksEndpoint();
-
-    @Inject
-    @ConfigProperty(name = "coin.client.id", defaultValue = "")
-    String getCoinClientId();
-
-    @Inject
-    @ConfigProperty(name = "coin.client.secret", defaultValue = "")
-    String getCoinClientSecret();
-
-    @Inject
-    @ConfigProperty(name = "coin.universal.identity.url", defaultValue = "")
-    String getCoinUniversalIdentityUrl();
-
-    @Inject
-    @ConfigProperty(name = "coin.universal.identity.endpoint", defaultValue = "")
-    String getCoinUniversalIdentityEndpoint();
-
-    @Inject
-    @ConfigProperty(name = "coin.extra.ca.certs", defaultValue = "")
-    String getCoinExtraCaCerts();
-}
-
-
-import javax.inject.Inject;
-import javax.inject.Singleton;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-@Singleton
-public class App {
-
-    private static final Logger log = LoggerFactory.getLogger(App.class);
-
-    @Inject
-    AppConfiguration appConfiguration;
-
-    public void run() {
-        String environment = appConfiguration.getEnvironment();
-        String artifactoryUsername = appConfiguration.getArtifactoryUsername();
-        String artifactoryApiKey = appConfiguration.getArtifactoryApiKey();
-        String artifactoryCertificatePath = appConfiguration.getArtifactoryCertificatePath();
-        String artifactoryBaseUrl = appConfiguration.getArtifactoryBaseUrl();
-        String downloadDirectory = appConfiguration.getDownloadDirectory();
-        String extractDirectory = appConfiguration.getExtractDirectory();
-        String apiUsername = appConfiguration.getApiUsername();
-        String apiPassword = appConfiguration.getApiPassword();
-        String apiUrl = appConfiguration.getApiUrl();
-        Boolean useCertificate = appConfiguration.useCertificate();
-        Boolean useMock = appConfiguration.useMock();
-        Boolean enableJsonLogging = appConfiguration.enableJsonLogging();
-        String lseCsiid = appConfiguration.getLseCsiid();
-        String lseEnvironmentClass = appConfiguration.getLseEnvironmentClass();
-        String lseEnvironmentName = appConfiguration.getLseEnvironmentName();
-        String lseProjectName = appConfiguration.getLseProjectName();
-        String lseVaultEnvironment = appConfiguration.getLseVaultEnvironment();
-        String lseK8sCluster = appConfiguration.getLseK8sCluster();
-        String lsePipelineName = appConfiguration.getLsePipelineName();
-        String lseBuildVersion = appConfiguration.getLseBuildVersion();
-        String lseSectorName = appConfiguration.getLseSectorName();
-        String[] lseProdArtifactoryBranches = appConfiguration.getLseProdArtifactoryBranches();
-        String coinBaseUrl = appConfiguration.getCoinBaseUrl();
-        String coinJwksEndpoint = appConfiguration.getCoinJwksEndpoint();
-        String coinClientId = appConfiguration.getCoinClientId();
-        String coinClientSecret = appConfiguration.getCoinClientSecret();
-        String coinUniversalIdentityUrl = appConfiguration.getCoinUniversalIdentityUrl();
-        String coinUniversalIdentityEndpoint = appConfiguration.getCoinUniversalIdentityEndpoint();
-        String coinExtraCaCertificates = appConfiguration.getCoinExtraCaCertificates();
-
-        // Use the configuration values as needed
-        // ...
-
-        log.info("Application started");
-    }
-
-    public static void main(String[] args) {
-        App app = new App();
-        app.run();
-    }
-}
+    // Example usage: Logging the values
+    log.info("API Endpoint: {}", apiEndpoint);
+    log.info("Artifactory Username: {}", artifactoryUsername);
+    log.info("Artifactory API Key: {}", artifactoryApiKey);
+    log.info("Artifactory Certificate Path: {}", artifactoryCertPath);
+    log.info("Artifactory Base URL: {}", artifactoryBaseUrl);
+    log.info("Download Directory: {}", downloadDir);
+    log.info("Extract Directory: {}", extractDir);
+    log.info("API Username: {}", apiUsername);
+    log.info("API Password: {}", apiPassword);
+    log.info("Use Certificate: {}", useCert);
+    log.info("Use Mock: {}", useMock);
+    log.info("JSON Logging: {}", jsonLogging);
+    log.info("LSE CSI ID: {}", lseCsiId);
+    log.info("LSE Environment Class: {}", lseEnvClass);
+    log.info("LSE Environment Name: {}", lseEnvName);
+    log.info("LSE Project Name: {}", lseProjectName);
+    log.info("LSE Vault Env: {}", lseVaultEnv);
+    log.info("LSE K8s Cluster: {}", lseK8sCluster);
+    log.info("LSE Pipeline Name: {}", lsePipelineName);
+    log.info("LSE Build Version: {}", lseBuildVersion);
+    log.info("LSE Sector Name: {}", lseSectorName);
+    log.info("LSE Prod Artifactory Branches: {}", lseProdArtifactoryBranches);
+    log.info("COIN Base URL: {}", coinBaseUrl);
+    log.info("COIN JWKS Endpoint: {}", coinJwksEndpoint);
+    log.info("COIN Client ID: {}", coinClientId);
+    log.info("COIN Client Secret: {}", coinClientSecret);
+    log.info("COIN Universal Identity URL: {}", coinUniversalIdentityUrl);
+    log.info("COIN Universal Identity Endpoint: {}", coinUniversalIdentityEndpoint);
+    log.info("COIN Extra CA Certs: {}", coinExtraCaCerts);
