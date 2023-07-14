@@ -1,3 +1,35 @@
+app.environment
+app.artifactory.username
+app.artifactory.apikey
+app.artifactory.cert.path
+app.artifactory.base.url
+app.download.dir
+app.extract.dir
+app.api.username
+app.api.password
+app.api.url
+app.use.cert
+app.use.mock
+app.json.logging
+lse.csiid
+lse.environment.class
+lse.environment.name
+lse.project.name
+lse.vault.env
+lse.k8s.cluster
+lse.pipeline.name
+lse.build.version
+lse.sector.name
+lse.prod.artifactory.branches=['master',  'release']
+
+coin.base.url
+coin.jwks.endpoint
+coin.client.id
+coin.client.secret
+coin.universal.identity.url
+coin.universal.identity.endpoint
+coin.extra.ca.certs
+
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.enterprise.context.ApplicationScoped;
