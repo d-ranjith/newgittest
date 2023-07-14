@@ -1,23 +1,66 @@
-import java.net.URI;
-import java.net.URISyntaxException;
+import org.apache.http.HttpEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
 
-public class ArtifactUrlConstructor {
+import java.io.IOException;
 
-    public static void main(String[] args) {
-        String baseUrl = "https://example.com/artifacts/";
-        String artifactId = "my-artifact";
-        String version = "1.0.0";
+public class TokenFetcher {
+    public String getAuthToken(String username, String apiKey) throws IOException {
+        // Artifactory authentication endpoint
+        String authEndpoint = "https://artifactory.example.com/api/auth";
+
+        // Create the HttpClient
+        HttpClient httpClient = HttpClients.createDefault();
 
         try {
-            URI artifactUrl = constructArtifactUrl(baseUrl, artifactId, version);
-            System.out.println("Artifact URL: " + artifactUrl.toString());
-        } catch (URISyntaxException e) {
-            System.err.println("Error constructing artifact URL: " + e.getMessage());
+            // Create the HTTP POST request
+            HttpPost httpPost = new HttpPost(authEndpoint);
+
+            // Set the request headers
+            httpPost.setHeader("Content-Type", "application/json");
+
+            // Create the request body
+            String requestBody = String.format("{\"username\": \"%s\", \"apiKey\": \"%s\"}", username, apiKey);
+            StringEntity requestEntity = new StringEntity(requestBody);
+            httpPost.setEntity(requestEntity);
+
+            // Execute the request
+            HttpResponse response = httpClient.execute(httpPost);
+
+            // Check if the request was successful
+            if (response.getStatusLine().getStatusCode() == 200) {
+                // Extract the token from the response
+                HttpEntity responseEntity = response.getEntity();
+                String responseBody = EntityUtils.toString(responseEntity);
+                // Parse the response body and extract the token using JSON parsing libraries
+
+                // Return the extracted token
+                return "YOUR_AUTH_TOKEN";
+            } else {
+                // Handle the case when the request fails
+                throw new RuntimeException("Failed to fetch the authentication token");
+            }
+        } finally {
+            // Close the HttpClient
+            httpClient.close();
         }
     }
-
-    private static URI constructArtifactUrl(String baseUrl, String artifactId, String version) throws URISyntaxException {
-        String artifactPath = String.format("%s/%s/%s.jar", artifactId, version, artifactId);
-        return new URI(baseUrl + artifactPath);
-    }
 }
+
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+// ...
+
+// Parse the response body and extract the token using JSON parsing libraries
+ObjectMapper objectMapper = new ObjectMapper();
+JsonNode jsonResponse = objectMapper.readTree(responseBody);
+String token = jsonResponse.get("token").asText();
+
+// Return the extracted token
+return token;
