@@ -1,36 +1,26 @@
-import io.smallrye.config.ConfigDefault;
-import io.smallrye.config.ConfigMapping;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import javax.inject.Singleton;
+import javax.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 
-@Getter
-@NoArgsConstructor
-@Singleton
-@ConfigMapping(prefix = "app")
 public interface AppConfiguration {
+    @Inject
+    @ConfigProperty(name = "app.api.endpoint")
+    String getApiEndpoint();
 
-    @ConfigDefault("default-api-endpoint")
-    String apiEndpoint();
+    @Inject
+    @ConfigProperty(name = "app.artifactory.username")
+    String getArtifactoryUsername();
 
-    @ConfigDefault("default-artifactory-username")
-    String artifactoryUsername();
+    @Inject
+    @ConfigProperty(name = "app.artifactory.apikey")
+    String getArtifactoryApiKey();
 
-    @ConfigDefault("default-artifactory-apikey")
-    String artifactoryApiKey();
+    // ... other properties
 
-    @ConfigDefault("default-artifactory-certificate-path")
-    String artifactoryCertificatePath();
+    @Inject
+    @ConfigProperty(name = "app.oauth.client.id")
+    String getOauthClientId();
 
-    @ConfigDefault("default-oauth-client-id")
-    String oauthClientId();
-
-    @ConfigDefault("default-oauth-client-secret")
-    String oauthClientSecret();
+    @Inject
+    @ConfigProperty(name = "app.oauth.client.secret")
+    String getOauthClientSecret();
 }
-
-
-implementation 'io.smallrye:smallrye-config:2.0.0'
-implementation 'io.smallrye:smallrye-config-common:2.0.0'
-implementation 'org.eclipse.microprofile.config:microprofile-config-api:2.0'
-annotationProcessor 'org.projectlombok:lombok:1.18.20'
