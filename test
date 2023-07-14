@@ -1,62 +1,23 @@
-app.environment
-app.artifactory.username
-app.artifactory.apikey
-app.artifactory.cert.path
-app.artifactory.base.url
-app.download.dir
-app.extract.dir
-app.api.username
-app.api.password
-app.api.url
-app.use.cert
-app.use.mock
-app.json.logging
-lse.csiid
-lse.environment.class
-lse.environment.name
-lse.project.name
-lse.vault.env
-lse.k8s.cluster
-lse.pipeline.name
-lse.build.version
-lse.sector.name
-lse.prod.artifactory.branches=['master',  'release']
+import java.net.URI;
+import java.net.URISyntaxException;
 
-coin.base.url
-coin.jwks.endpoint
-coin.client.id
-coin.client.secret
-coin.universal.identity.url
-coin.universal.identity.endpoint
-coin.extra.ca.certs
+public class ArtifactUrlConstructor {
 
-    // Example usage: Logging the values
-    log.info("API Endpoint: {}", apiEndpoint);
-    log.info("Artifactory Username: {}", artifactoryUsername);
-    log.info("Artifactory API Key: {}", artifactoryApiKey);
-    log.info("Artifactory Certificate Path: {}", artifactoryCertPath);
-    log.info("Artifactory Base URL: {}", artifactoryBaseUrl);
-    log.info("Download Directory: {}", downloadDir);
-    log.info("Extract Directory: {}", extractDir);
-    log.info("API Username: {}", apiUsername);
-    log.info("API Password: {}", apiPassword);
-    log.info("Use Certificate: {}", useCert);
-    log.info("Use Mock: {}", useMock);
-    log.info("JSON Logging: {}", jsonLogging);
-    log.info("LSE CSI ID: {}", lseCsiId);
-    log.info("LSE Environment Class: {}", lseEnvClass);
-    log.info("LSE Environment Name: {}", lseEnvName);
-    log.info("LSE Project Name: {}", lseProjectName);
-    log.info("LSE Vault Env: {}", lseVaultEnv);
-    log.info("LSE K8s Cluster: {}", lseK8sCluster);
-    log.info("LSE Pipeline Name: {}", lsePipelineName);
-    log.info("LSE Build Version: {}", lseBuildVersion);
-    log.info("LSE Sector Name: {}", lseSectorName);
-    log.info("LSE Prod Artifactory Branches: {}", lseProdArtifactoryBranches);
-    log.info("COIN Base URL: {}", coinBaseUrl);
-    log.info("COIN JWKS Endpoint: {}", coinJwksEndpoint);
-    log.info("COIN Client ID: {}", coinClientId);
-    log.info("COIN Client Secret: {}", coinClientSecret);
-    log.info("COIN Universal Identity URL: {}", coinUniversalIdentityUrl);
-    log.info("COIN Universal Identity Endpoint: {}", coinUniversalIdentityEndpoint);
-    log.info("COIN Extra CA Certs: {}", coinExtraCaCerts);
+    public static void main(String[] args) {
+        String baseUrl = "https://example.com/artifacts/";
+        String artifactId = "my-artifact";
+        String version = "1.0.0";
+
+        try {
+            URI artifactUrl = constructArtifactUrl(baseUrl, artifactId, version);
+            System.out.println("Artifact URL: " + artifactUrl.toString());
+        } catch (URISyntaxException e) {
+            System.err.println("Error constructing artifact URL: " + e.getMessage());
+        }
+    }
+
+    private static URI constructArtifactUrl(String baseUrl, String artifactId, String version) throws URISyntaxException {
+        String artifactPath = String.format("%s/%s/%s.jar", artifactId, version, artifactId);
+        return new URI(baseUrl + artifactPath);
+    }
+}
