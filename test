@@ -34,131 +34,133 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 import javax.enterprise.context.ApplicationScoped;
 import javax.inject.Inject;
+import java.util.Arrays;
+import java.util.List;
 
 @ApplicationScoped
 public interface AppConfiguration {
 
     @Inject
-    @ConfigProperty(name = "app.environment")
+    @ConfigProperty(name = "app.environment", defaultValue = "development")
     String getEnvironment();
 
     @Inject
-    @ConfigProperty(name = "app.artifactory.username")
+    @ConfigProperty(name = "app.artifactory.username", defaultValue = "admin")
     String getArtifactoryUsername();
 
     @Inject
-    @ConfigProperty(name = "app.artifactory.apikey")
+    @ConfigProperty(name = "app.artifactory.apikey", defaultValue = "")
     String getArtifactoryApiKey();
 
     @Inject
-    @ConfigProperty(name = "app.artifactory.cert.path")
+    @ConfigProperty(name = "app.artifactory.cert.path", defaultValue = "")
     String getArtifactoryCertificatePath();
 
     @Inject
-    @ConfigProperty(name = "app.artifactory.base.url")
+    @ConfigProperty(name = "app.artifactory.base.url", defaultValue = "")
     String getArtifactoryBaseUrl();
 
     @Inject
-    @ConfigProperty(name = "app.download.dir")
+    @ConfigProperty(name = "app.download.dir", defaultValue = "")
     String getDownloadDirectory();
 
     @Inject
-    @ConfigProperty(name = "app.extract.dir")
+    @ConfigProperty(name = "app.extract.dir", defaultValue = "")
     String getExtractDirectory();
 
     @Inject
-    @ConfigProperty(name = "app.api.username")
+    @ConfigProperty(name = "app.api.username", defaultValue = "")
     String getApiUsername();
 
     @Inject
-    @ConfigProperty(name = "app.api.password")
+    @ConfigProperty(name = "app.api.password", defaultValue = "")
     String getApiPassword();
 
     @Inject
-    @ConfigProperty(name = "app.api.url")
+    @ConfigProperty(name = "app.api.url", defaultValue = "")
     String getApiUrl();
 
     @Inject
-    @ConfigProperty(name = "app.use.cert")
-    Boolean useCertificate();
+    @ConfigProperty(name = "app.use.cert", defaultValue = "")
+    boolean useCertificate();
 
     @Inject
-    @ConfigProperty(name = "app.use.mock")
-    Boolean useMock();
+    @ConfigProperty(name = "app.use.mock", defaultValue = "")
+    boolean useMock();
 
     @Inject
-    @ConfigProperty(name = "app.json.logging")
-    Boolean enableJsonLogging();
+    @ConfigProperty(name = "app.json.logging", defaultValue = "")
+    boolean enableJsonLogging();
 
     @Inject
-    @ConfigProperty(name = "lse.csiid")
+    @ConfigProperty(name = "lse.csiid", defaultValue = "")
     String getLseCsiid();
 
     @Inject
-    @ConfigProperty(name = "lse.environment.class")
+    @ConfigProperty(name = "lse.environment.class", defaultValue = "")
     String getLseEnvironmentClass();
 
     @Inject
-    @ConfigProperty(name = "lse.environment.name")
+    @ConfigProperty(name = "lse.environment.name", defaultValue = "")
     String getLseEnvironmentName();
 
     @Inject
-    @ConfigProperty(name = "lse.project.name")
+    @ConfigProperty(name = "lse.project.name", defaultValue = "")
     String getLseProjectName();
 
     @Inject
-    @ConfigProperty(name = "lse.vault.env")
+    @ConfigProperty(name = "lse.vault.env", defaultValue = "")
     String getLseVaultEnvironment();
 
     @Inject
-    @ConfigProperty(name = "lse.k8s.cluster")
-    String getLseK8sCluster();
+    @ConfigProperty(name = "lse.k8s.cluster", defaultValue = "")
+    String getLseKubernetesCluster();
 
     @Inject
-    @ConfigProperty(name = "lse.pipeline.name")
+    @ConfigProperty(name = "lse.pipeline.name", defaultValue = "")
     String getLsePipelineName();
 
     @Inject
-    @ConfigProperty(name = "lse.build.version")
+    @ConfigProperty(name = "lse.build.version", defaultValue = "")
     String getLseBuildVersion();
 
     @Inject
-    @ConfigProperty(name = "lse.sector.name")
+    @ConfigProperty(name = "lse.sector.name", defaultValue = "")
     String getLseSectorName();
 
     @Inject
     @ConfigProperty(name = "lse.prod.artifactory.branches", defaultValue = "master,release")
-    String[] getLseProdArtifactoryBranches();
+    List<String> getLseProdArtifactoryBranches();
 
     @Inject
-    @ConfigProperty(name = "coin.base.url")
+    @ConfigProperty(name = "coin.base.url", defaultValue = "")
     String getCoinBaseUrl();
 
     @Inject
-    @ConfigProperty(name = "coin.jwks.endpoint")
+    @ConfigProperty(name = "coin.jwks.endpoint", defaultValue = "")
     String getCoinJwksEndpoint();
 
     @Inject
-    @ConfigProperty(name = "coin.client.id")
+    @ConfigProperty(name = "coin.client.id", defaultValue = "")
     String getCoinClientId();
 
     @Inject
-    @ConfigProperty(name = "coin.client.secret")
+    @ConfigProperty(name = "coin.client.secret", defaultValue = "")
     String getCoinClientSecret();
 
     @Inject
-    @ConfigProperty(name = "coin.universal.identity.url")
+    @ConfigProperty(name = "coin.universal.identity.url", defaultValue = "")
     String getCoinUniversalIdentityUrl();
 
     @Inject
-    @ConfigProperty(name = "coin.universal.identity.endpoint")
+    @ConfigProperty(name = "coin.universal.identity.endpoint", defaultValue = "")
     String getCoinUniversalIdentityEndpoint();
 
     @Inject
-    @ConfigProperty(name = "coin.extra.ca.certs")
-    String getCoinExtraCaCertificates();
-
+    @ConfigProperty(name = "coin.extra.ca.certs", defaultValue = "")
+    String getCoinExtraCaCerts();
 }
+
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
