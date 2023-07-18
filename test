@@ -1,28 +1,26 @@
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+public class FileUtil {
+    public static String getFileExtension(String filePath) {
+        if (filePath == null) {
+            return null;
+        }
 
-public void printFileSize(String filePath) {
-    try {
-        Path path = Paths.get(filePath);
-        long fileSize = Files.size(path);
-        String readableSize = getReadableSize(fileSize);
-        System.out.println("File Size: " + readableSize);
-    } catch (IOException e) {
-        System.err.println("Error occurred while getting file size: " + e.getMessage());
-    }
-}
+        int lastDotIndex = filePath.lastIndexOf(".");
+        if (lastDotIndex == -1 || lastDotIndex == filePath.length() - 1) {
+            return "";
+        }
 
-private String getReadableSize(long fileSize) {
-    String[] units = {"bytes", "KB", "MB", "GB", "TB"};
-    int unitIndex = 0;
-    double size = fileSize;
+        String extension = filePath.substring(lastDotIndex + 1);
+        int lastSeparatorIndex = extension.lastIndexOf("/");
+        if (lastSeparatorIndex != -1 && lastSeparatorIndex < extension.length() - 1) {
+            return extension.substring(lastSeparatorIndex + 1);
+        }
 
-    while (size >= 1024 && unitIndex < units.length - 1) {
-        size /= 1024;
-        unitIndex++;
+        return extension;
     }
 
-    return String.format("%.2f %s", size, units[unitIndex]);
+    public static void main(String[] args) {
+        String filePath = "/path/to/abd.tar.gz";
+        String extension = getFileExtension(filePath);
+        System.out.println("File extension: " + extension);
+    }
 }
