@@ -1,66 +1,19 @@
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.util.EntityUtils;
+    private ArtifactoryService artifactoryService;
+    private OAuthService oauthService;
+    private ApiService apiService;
+    private ArchiveExtractor archiveExtractor;
 
-import java.io.IOException;
-
-public class TokenFetcher {
-    public String getAuthToken(String username, String apiKey) throws IOException {
-        // Artifactory authentication endpoint
-        String authEndpoint = "https://artifactory.example.com/api/auth";
-
-        // Create the HttpClient
-        HttpClient httpClient = HttpClients.createDefault();
-
-        try {
-            // Create the HTTP POST request
-            HttpPost httpPost = new HttpPost(authEndpoint);
-
-            // Set the request headers
-            httpPost.setHeader("Content-Type", "application/json");
-
-            // Create the request body
-            String requestBody = String.format("{\"username\": \"%s\", \"apiKey\": \"%s\"}", username, apiKey);
-            StringEntity requestEntity = new StringEntity(requestBody);
-            httpPost.setEntity(requestEntity);
-
-            // Execute the request
-            HttpResponse response = httpClient.execute(httpPost);
-
-            // Check if the request was successful
-            if (response.getStatusLine().getStatusCode() == 200) {
-                // Extract the token from the response
-                HttpEntity responseEntity = response.getEntity();
-                String responseBody = EntityUtils.toString(responseEntity);
-                // Parse the response body and extract the token using JSON parsing libraries
-
-                // Return the extracted token
-                return "YOUR_AUTH_TOKEN";
-            } else {
-                // Handle the case when the request fails
-                throw new RuntimeException("Failed to fetch the authentication token");
-            }
-        } finally {
-            // Close the HttpClient
-            httpClient.close();
-        }
+    public static void main(String[] args) {
+        App app = new App();
+        app.run();
     }
-}
 
-
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-
-// ...
-
-// Parse the response body and extract the token using JSON parsing libraries
-ObjectMapper objectMapper = new ObjectMapper();
-JsonNode jsonResponse = objectMapper.readTree(responseBody);
-String token = jsonResponse.get("token").asText();
+    public App() {
+        // Instantiate the dependencies
+        this.artifactoryService = new ArtifactoryService();
+        this.oauthService = new OAuthService();
+        this.apiService = new ApiService();
+        this.archiveExtractor = new ArchiveExtractor();
 
 // Return the extracted token
 return token;
