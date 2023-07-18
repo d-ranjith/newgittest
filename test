@@ -1,81 +1,28 @@
-import org.apache.http.HttpHeaders;
-import org.apache.http.HttpResponse;
-import org.apache.http.auth.AuthScope;
-import org.apache.http.auth.UsernamePasswordCredentials;
-import org.apache.http.client.CredentialsProvider;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.protocol.HttpClientContext;
-import org.apache.http.conn.ssl.SSLContextBuilder;
-import org.apache.http.conn.ssl.TrustSelfSignedStrategy;
-import org.apache.http.impl.client.BasicCredentialsProvider;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClientBuilder;
-import org.apache.http.ssl.SSLContexts;
-
-import javax.net.ssl.SSLContext;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.security.GeneralSecurityException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
-public class Example {
-    public static void main(String[] args) {
-        String username = "YOUR_USERNAME";
-        String apiKey = "YOUR_API_KEY";
-        String certificatePath = "PATH_TO_CORPORATE_CERTIFICATE";
-        String artifactoryUrl = "ARTIFACTORY_URL";
-        String fileUrl = artifactoryUrl + "/path/to/file";
-        String destinationPath = "/path/to/save/file";
+public void printFileSize(String filePath) {
+    try {
+        Path path = Paths.get(filePath);
+        long fileSize = Files.size(path);
+        String readableSize = getReadableSize(fileSize);
+        System.out.println("File Size: " + readableSize);
+    } catch (IOException e) {
+        System.err.println("Error occurred while getting file size: " + e.getMessage());
+    }
+}
 
-        try {
-            HttpClient httpClient = createHttpClientWithBasicAuth(username, apiKey, certificatePath);
+private String getReadableSize(long fileSize) {
+    String[] units = {"bytes", "KB", "MB", "GB", "TB"};
+    int unitIndex = 0;
+    double size = fileSize;
 
-            HttpGet request = new HttpGet(fileUrl);
-            request.setHeader(HttpHeaders.ACCEPT, "application/octet-stream");
-
-            HttpClientContext context = HttpClientContext.create();
-            HttpResponse response = httpClient.execute(request, context);
-
-            int statusCode = response.getStatusLine().getStatusCode();
-            if (statusCode == 200) {
-                HttpEntity entity = response.getEntity();
-                InputStream inputStream = entity.getContent();
-
-                OutputStream outputStream = new FileOutputStream(destinationPath);
-
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    outputStream.write(buffer, 0, bytesRead);
-                }
-
-                outputStream.close();
-                inputStream.close();
-
-                System.out.println("File downloaded successfully.");
-            } else {
-                System.out.println("Failed to download file from Artifactory. Status code: " + statusCode);
-            }
-        } catch (IOException | GeneralSecurityException e) {
-            e.printStackTrace();
-            // Handle any exceptions that occur during the download process
-        }
+    while (size >= 1024 && unitIndex < units.length - 1) {
+        size /= 1024;
+        unitIndex++;
     }
 
-    private static HttpClient createHttpClientWithBasicAuth(String username, String apiKey, String certificatePath)
-            throws IOException, GeneralSecurityException {
-        CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
-        credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials(username, apiKey));
-
-        SSLContext sslContext = SSLContexts.custom()
-                .loadTrustMaterial(certificatePath, TrustSelfSignedStrategy.INSTANCE)
-                .build();
-
-        return HttpClientBuilder.create()
-                .setDefaultCredentialsProvider(credentialsProvider)
-                .setSSLContext(sslContext)
-                .build();
-    }
+    return String.format("%.2f %s", size, units[unitIndex]);
 }
