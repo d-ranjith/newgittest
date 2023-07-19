@@ -1,6 +1,30 @@
-    private void createDirectoryIfNotExists(String directoryPath) {
-        File directory = new File(directoryPath);
-        if (!directory.exists()) {
-            directory.mkdirs();
+public class FileExtensionExtractor {
+
+    public static String getFileExtension(String filePath) {
+        if (filePath == null) {
+            throw new IllegalArgumentException("File path cannot be null.");
         }
+
+        int lastSeparatorIndex = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
+        int lastExtensionIndex = filePath.lastIndexOf('.');
+
+        // Check if the last dot is after the last separator (directory separator) character.
+        if (lastExtensionIndex > lastSeparatorIndex) {
+            return filePath.substring(lastExtensionIndex + 1);
+        }
+
+        return ""; // If there's no valid extension, return an empty string.
     }
+
+    public static void main(String[] args) {
+        String filePath1 = "path/to/abc.tar.gz";
+        String filePath2 = "another/abc.zip";
+        String filePath3 = "no_extension_file";
+        String filePath4 = "file.with.multiple.dots.";
+
+        System.out.println(getFileExtension(filePath1)); // Output: tar.gz
+        System.out.println(getFileExtension(filePath2)); // Output: zip
+        System.out.println(getFileExtension(filePath3)); // Output: (Empty String)
+        System.out.println(getFileExtension(filePath4)); // Output: (Empty String)
+    }
+}
