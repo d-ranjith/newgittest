@@ -1,32 +1,31 @@
-import org.apache.commons.io.FilenameUtils;
+public class Main {
+    public static void main(String[] args) {
+        String version = "1100-abcdb1223-custom-fw-work";
+        List<String> validBuildTypes = Arrays.asList("master", "feature");
 
-public class FileExtensionExtractor {
+        String buildBranchName = extractBuildBranchName(version);
+        System.out.println("Build Branch Name: " + buildBranchName);
 
-    public static String getFileExtension(String filePath) {
-        if (filePath == null) {
-            throw new IllegalArgumentException("File path cannot be null.");
+        // Check if the buildBranchName is in the validBuildTypes list
+        if (!validBuildTypes.contains(buildBranchName)) {
+            System.out.println("Invalid build branch!");
+            // Handle the case for invalid build branch
+        } else {
+            System.out.println("Valid build branch!");
+            // Continue with processing for valid build branch
         }
-
-        String baseName = FilenameUtils.getBaseName(filePath);
-        String extension = FilenameUtils.getExtension(filePath);
-
-        int lastDotIndex = baseName.lastIndexOf('.');
-        if (lastDotIndex >= 0 && lastDotIndex < baseName.length() - 1) {
-            return baseName.substring(lastDotIndex + 1) + "." + extension;
-        }
-
-        return ""; // If there's no valid extension, return an empty string.
     }
 
-    public static void main(String[] args) {
-        String filePath1 = "path/to/abc.tar.gz";
-        String filePath2 = "another/abc.zip";
-        String filePath3 = "no_extension_file";
-        String filePath4 = "file.with.multiple.dots.";
-
-        System.out.println(getFileExtension(filePath1)); // Output: tar.gz
-        System.out.println(getFileExtension(filePath2)); // Output: zip
-        System.out.println(getFileExtension(filePath3)); // Output: (Empty String)
-        System.out.println(getFileExtension(filePath4)); // Output: (Empty String)
+    private static String extractBuildBranchName(String version) {
+        int firstDashIndex = version.indexOf('-');
+        if (firstDashIndex != -1) {
+            int secondDashIndex = version.indexOf('-', firstDashIndex + 1);
+            if (secondDashIndex != -1) {
+                return version.substring(secondDashIndex + 1);
+            }
+        }
+        // If no second dash is found or the second dash is the last character,
+        // return the whole version as the build branch name
+        return version;
     }
 }
