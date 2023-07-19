@@ -1,51 +1,45 @@
-import java.io.File;
+import java.io.*;
+import java.nio.file.*;
+import java.util.zip.*;
 
-public class FileUtil {
-    public static String getFileExtension(File file) {
-        if (file == null) {
-            return null;
+public class ArchiveExtractor {
+
+    private void extractZipArchive(String filePath, String extractionDirectory) {
+        try (ZipInputStream zipInputStream = new ZipInputStream(Files.newInputStream(Path.of(filePath)))) {
+            ZipEntry entry;
+            while ((entry = zipInputStream.getNextEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    String extractedFileName = entry.getName();
+                    File extractedFile = new File(extractionDirectory, extractedFileName);
+                    Files.copy(zipInputStream, extractedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                    System.out.println("Extracted file: " + extractedFile.getAbsolutePath());
+                }
+                zipInputStream.closeEntry();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        String fileName = file.getName();
-        int lastDotIndex = fileName.lastIndexOf(".");
-        if (lastDotIndex == -1 || lastDotIndex == fileName.length() - 1) {
-            return "";
-        }
-
-        return fileName.substring(lastDotIndex + 1);
     }
 
-    public static void main(String[] args) {
-        File file = new File("/path/to/abd.tar.gz");
-        String extension = getFileExtension(file);
-        System.out.println("File extension: " + extension);
-    }
-}
+    private void extractTarGzArchive(String filePath, String extractionDirectory) {
+        try (InputStream fileInputStream = Files.newInputStream(Path.of(filePath));
+             BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
+             GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(bufferedInputStream);
+             TarArchiveInputStream tarInputStream = new TarArchiveInputStream(gzipInputStream)) {
 
-
-public class FileUtil {
-    public static String getFileExtension(String filePath) {
-        if (filePath == null) {
-            return null;
+            TarArchiveEntry entry;
+            while ((entry = tarInputStream.getNextTarEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    String extractedFileName = entry.getName();
+                    File extractedFile = new File(extractionDirectory, extractedFileName);
+                    FileOutputStream outputStream = new FileOutputStream(extractedFile);
+                    IOUtils.copy(tarInputStream, outputStream);
+                    outputStream.close();
+                    System.out.println("Extracted file: " + extractedFile.getAbsolutePath());
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        int lastDotIndex = filePath.lastIndexOf(".");
-        if (lastDotIndex == -1 || lastDotIndex == filePath.length() - 1) {
-            return "";
-        }
-
-        String extension = filePath.substring(lastDotIndex + 1);
-        int lastSeparatorIndex = extension.lastIndexOf("/");
-        if (lastSeparatorIndex != -1 && lastSeparatorIndex < extension.length() - 1) {
-            return extension.substring(lastSeparatorIndex + 1);
-        }
-
-        return extension;
-    }
-
-    public static void main(String[] args) {
-        String filePath = "/path/to/abd.tar.gz";
-        String extension = getFileExtension(filePath);
-        System.out.println("File extension: " + extension);
     }
 }
