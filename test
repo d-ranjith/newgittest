@@ -1,45 +1,6 @@
-import java.io.*;
-import java.nio.file.*;
-import java.util.zip.*;
-
-public class ArchiveExtractor {
-
-    private void extractZipArchive(String filePath, String extractionDirectory) {
-        try (ZipInputStream zipInputStream = new ZipInputStream(Files.newInputStream(Path.of(filePath)))) {
-            ZipEntry entry;
-            while ((entry = zipInputStream.getNextEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    String extractedFileName = entry.getName();
-                    File extractedFile = new File(extractionDirectory, extractedFileName);
-                    Files.copy(zipInputStream, extractedFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    System.out.println("Extracted file: " + extractedFile.getAbsolutePath());
-                }
-                zipInputStream.closeEntry();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+    private void createDirectoryIfNotExists(String directoryPath) {
+        File directory = new File(directoryPath);
+        if (!directory.exists()) {
+            directory.mkdirs();
         }
     }
-
-    private void extractTarGzArchive(String filePath, String extractionDirectory) {
-        try (InputStream fileInputStream = Files.newInputStream(Path.of(filePath));
-             BufferedInputStream bufferedInputStream = new BufferedInputStream(fileInputStream);
-             GzipCompressorInputStream gzipInputStream = new GzipCompressorInputStream(bufferedInputStream);
-             TarArchiveInputStream tarInputStream = new TarArchiveInputStream(gzipInputStream)) {
-
-            TarArchiveEntry entry;
-            while ((entry = tarInputStream.getNextTarEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    String extractedFileName = entry.getName();
-                    File extractedFile = new File(extractionDirectory, extractedFileName);
-                    FileOutputStream outputStream = new FileOutputStream(extractedFile);
-                    IOUtils.copy(tarInputStream, outputStream);
-                    outputStream.close();
-                    System.out.println("Extracted file: " + extractedFile.getAbsolutePath());
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-}
