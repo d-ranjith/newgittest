@@ -1,4 +1,4 @@
-import java.io.File;
+import org.apache.commons.io.FilenameUtils;
 
 public class FileExtensionExtractor {
 
@@ -7,12 +7,12 @@ public class FileExtensionExtractor {
             throw new IllegalArgumentException("File path cannot be null.");
         }
 
-        int lastSeparatorIndex = Math.max(filePath.lastIndexOf(File.separatorChar), filePath.lastIndexOf('/'));
-        int lastExtensionIndex = filePath.lastIndexOf('.');
+        String baseName = FilenameUtils.getBaseName(filePath);
+        String extension = FilenameUtils.getExtension(filePath);
 
-        // Check if the last dot is after the last separator character.
-        if (lastExtensionIndex > lastSeparatorIndex) {
-            return filePath.substring(lastExtensionIndex + 1);
+        int lastDotIndex = baseName.lastIndexOf('.');
+        if (lastDotIndex >= 0 && lastDotIndex < baseName.length() - 1) {
+            return baseName.substring(lastDotIndex + 1) + "." + extension;
         }
 
         return ""; // If there's no valid extension, return an empty string.
@@ -24,15 +24,9 @@ public class FileExtensionExtractor {
         String filePath3 = "no_extension_file";
         String filePath4 = "file.with.multiple.dots.";
 
-        // Find the file name by removing the directory part of the path
-        String fileName1 = filePath1.substring(Math.max(filePath1.lastIndexOf(File.separatorChar), filePath1.lastIndexOf('/')) + 1);
-        String fileName2 = filePath2.substring(Math.max(filePath2.lastIndexOf(File.separatorChar), filePath2.lastIndexOf('/')) + 1);
-        String fileName3 = filePath3.substring(Math.max(filePath3.lastIndexOf(File.separatorChar), filePath3.lastIndexOf('/')) + 1);
-        String fileName4 = filePath4.substring(Math.max(filePath4.lastIndexOf(File.separatorChar), filePath4.lastIndexOf('/')) + 1);
-
-        System.out.println(getFileExtension(fileName1)); // Output: tar.gz
-        System.out.println(getFileExtension(fileName2)); // Output: zip
-        System.out.println(getFileExtension(fileName3)); // Output: (Empty String)
-        System.out.println(getFileExtension(fileName4)); // Output: (Empty String)
+        System.out.println(getFileExtension(filePath1)); // Output: tar.gz
+        System.out.println(getFileExtension(filePath2)); // Output: zip
+        System.out.println(getFileExtension(filePath3)); // Output: (Empty String)
+        System.out.println(getFileExtension(filePath4)); // Output: (Empty String)
     }
 }
