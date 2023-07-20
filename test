@@ -1,31 +1,9 @@
-public class Main {
-    public static void main(String[] args) {
-        String version = "1100-abcdb1223-custom-fw-work";
-        List<String> validBuildTypes = Arrays.asList("master", "feature");
-
-        String buildBranchName = extractBuildBranchName(version);
-        System.out.println("Build Branch Name: " + buildBranchName);
-
-        // Check if the buildBranchName is in the validBuildTypes list
-        if (!validBuildTypes.contains(buildBranchName)) {
-            System.out.println("Invalid build branch!");
-            // Handle the case for invalid build branch
-        } else {
-            System.out.println("Valid build branch!");
-            // Continue with processing for valid build branch
-        }
-    }
-
-    private static String extractBuildBranchName(String version) {
-        int firstDashIndex = version.indexOf('-');
-        if (firstDashIndex != -1) {
-            int secondDashIndex = version.indexOf('-', firstDashIndex + 1);
-            if (secondDashIndex != -1) {
-                return version.substring(secondDashIndex + 1);
-            }
-        }
-        // If no second dash is found or the second dash is the last character,
-        // return the whole version as the build branch name
-        return version;
-    }
+private String getEnvVariable(String name, String defaultValue) {
+    String value = System.getenv(name);
+    return value != null ? value : defaultValue;
 }
+
+// Usage example:
+String envVar1 = getEnvVariable("ENV_VAR_1", "default_value_for_ENV_VAR_1");
+String envVar2 = getEnvVariable("ENV_VAR_2", "default_value_for_ENV_VAR_2");
+String envVar3 = getEnvVariable("ENV_VAR_3", "default_value_for_ENV_VAR_3");
