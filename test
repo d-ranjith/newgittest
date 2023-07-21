@@ -1,3 +1,22 @@
+App.java
+App.java is the main class that serves as the entry point to the [Project Name] application. It orchestrates the execution of various services and resources, allowing the application to perform its intended functionality. The class is responsible for reading configuration values from AppConfiguration, interacting with external services like ArtifactoryService and OAuthService, and making API calls using ApiService.
+
+Implementation Details
+The App class is annotated with @Singleton, making it a singleton component in the application. It uses dependency injection through the @Inject annotation to obtain instances of various services and configurations defined in the application.
+
+Methods
+run()
+The run() method is the main entry point to the application. It is called when the application starts. Within this method, the application follows a series of steps to perform its tasks. It first reads the required configuration values from the AppConfiguration instance. It then proceeds to download a file from Artifactory using ArtifactoryService, fetches an OAuth token using OAuthService, and finally uploads a payload to an API endpoint using ApiService. Additionally, the method also extracts and displays the contents of an archive using ArchiveExtractor. The extracted log messages are handled by the custom Logger class.
+
+logMessage(String message, String level, String verbosity, String module)
+The logMessage() method is a utility method to log messages with varying log levels and verbosity levels. It uses the Logger class to log messages based on the specified parameters. The log message includes a timestamp, log level, verbosity level, module, and the actual message.
+
+Usage
+To run the [Project Name] application, execute the main() method in the App class. This method initializes the application and triggers the run() method, which carries out the application's tasks.
+
+Please refer to the Getting Started section of the README for instructions on how to run the application.
+
+
 [Project Name]
 [Project Name] is a [brief description of the project's purpose]. This repository contains the source code for the project and is open to contributions from the community. We encourage and welcome contributions, bug reports, and feature requests from all developers.
 
