@@ -1,52 +1,42 @@
 package com.yourcompany.app.logger;
 
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.time.LocalDateTime;
 
-public class LoggerUtil {
+public class Logger {
 
-    private static final Logger LOG = LoggerFactory.getLogger(LoggerUtil.class);
+    private static final org.slf4j.Logger LOG = LoggerFactory.getLogger(Logger.class);
 
-    private static FileWriter fileWriter;
-    private static StringBuilder logBuffer = new StringBuilder();
-
-    static {
-        try {
-            // Initialize the FileWriter
-            fileWriter = new FileWriter(new File("app.log"));
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
+    private static final String LOG_FILE_PATH = "app.log";
+    private static final String MARKER = "----- BEGIN LOG MESSAGES -----\n";
 
     public static void logMessage(String message, String level, String verbosity, String module) {
         String formattedMessage = String.format("{ timestamp: %s, LEVEL: %s, VERBOSITY: %s, MODULE: %s, %s }",
-                LocalDateTime.now(), level, verbosity, module, message);
+                java.time.LocalDateTime.now(), level, verbosity, module, message);
 
-        // Log to SLF4J
         switch (level.toUpperCase()) {
             case "DEBUG":
-                if ("HIGH".equalsIgnoreCase(verbosity)) {
+                if (verbosity.equalsIgnoreCase("HIGH")) {
                     LOG.debug(formattedMessage);
                 }
                 break;
             case "INFO":
-                if ("HIGH".equalsIgnoreCase(verbosity) || "MEDIUM".equalsIgnoreCase(verbosity)) {
+                if (verbosity.equalsIgnoreCase("HIGH") || verbosity.equalsIgnoreCase("MEDIUM")) {
                     LOG.info(formattedMessage);
                 }
                 break;
             case "WARN":
-                if ("HIGH".equalsIgnoreCase(verbosity) || "MEDIUM".equalsIgnoreCase(verbosity)) {
+                if (verbosity.equalsIgnoreCase("HIGH") || verbosity.equalsIgnoreCase("MEDIUM")) {
                     LOG.warn(formattedMessage);
                 }
                 break;
             case "ERROR":
-                if ("HIGH".equalsIgnoreCase(verbosity) || "MEDIUM".equalsIgnoreCase(verbosity)) {
+                if (verbosity.equalsIgnoreCase("HIGH") || verbosity.equalsIgnoreCase("MEDIUM")) {
                     LOG.error(formattedMessage);
                 }
                 break;
@@ -55,27 +45,48 @@ public class LoggerUtil {
                 break;
         }
 
-        // Buffer the log message to print later
-        logBuffer.append(formattedMessage).append("\n");
+        // Store the log message in the file
+        try (PrintWriter writer = new PrintWriter(new FileWriter(LOG_FILE_PATH, true))) {
+            writer.println(formattedMessage);
+            writer.flush();
+        } catch (IOException e) {
+            // Handle IOException if needed
+        }
     }
 
     public static void printLogsAfterMarker() {
-        // Add a marker in the logs to indicate where to print the logs
-        logBuffer.append("----LOGS AFTER MARKER----\n");
-
-        // Print the log contents after the marker
-        System.out.println(logBuffer.toString());
-
-        // Flush and close the file writer
-        try {
-            fileWriter.write(logBuffer.toString());
-            fileWriter.flush();
-            fileWriter.close();
+        // Print all the log messages after the marker
+        try (PrintWriter writer = new PrintWriter(new FileWriter(LOG_FILE_PATH, true))) {
+            writer.println(MARKER);
+            writer.flush();
         } catch (IOException e) {
-            e.printStackTrace();
+            // Handle IOException if needed
+        }
+    }
+
+    public static void clearLogFile() {
+        // Clear the log file
+        File file = new File(LOG_FILE_PATH);
+        if (file.exists()) {
+            file.delete();
         }
     }
 }
+
+To achieve the desired behavior, you can follow these steps:
+
+At the beginning of the application or when the log file is initialized, call clearLogFile() to ensure the log file is empty and ready for new log messages.
+
+Throughout the program, use logMessage() method to log messages. The log messages will be both printed to the console (based on log level and verbosity) and appended to the log file.
+
+At the end of the program's execution, call printLogsAfterMarker() to print the marker (if log messages were logged) and all the log messages after the marker. This method will ensure that the marker is only present once at the beginning of the log file.
+
+Here's the sequence of method calls:
+
+Call clearLogFile() at the start of the application (or when the log file is initialized).
+Throughout the program, use logMessage() method to log messages.
+At the end of the program's execution, call printLogsAfterMarker() to print the marker and all log messages after the marker.
+
 
 
 In the above implementation, the logMessage method is responsible for logging messages with different levels and verbosity. The behavior of verbosity and debug level in the implementation is as follows:
