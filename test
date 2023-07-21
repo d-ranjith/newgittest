@@ -1,6 +1,16 @@
-App.java
-App.java is the main class that serves as the entry point to the [Project Name] application. It orchestrates the execution of various services and resources, allowing the application to perform its intended functionality. The class is responsible for reading configuration values from AppConfiguration, interacting with external services like ArtifactoryService and OAuthService, and making API calls using ApiService.
+The application is a Kubernetes Helm chart that runs as a Kubernetes Job. Its primary purpose is to fetch artifacts from JFrog Artifactory, extract the contents of the artifacts, and interact with an external service (ABC service) for JWT authorization. The application follows these key steps:
 
+Fetch Artifacts from JFrog Artifactory: The application connects to JFrog Artifactory using credentials (username and API key) provided as configuration. It then downloads the specified artifacts from Artifactory.
+
+Extract Artifact Contents: After fetching the artifacts, the application extracts their contents. It supports both ZIP and Tar Gzipped archives, utilizing appropriate methods to extract the files.
+
+JWT Token Authorization with ABC Service: The application needs to interact with the ABC service, which requires authorization using a JWT token. The application fetches the required OAuth token from the ABC service using the provided client_id and client_secret.
+
+Payload Acceptance: Once the artifacts are fetched, extracted, and the JWT token is acquired, the application proceeds to upload the payload to a specific API endpoint using the ABC service. It utilizes the JWT token to authorize this upload.
+
+Kubernetes Helm Chart and K8s Job: The application is packaged as a Helm chart for easy deployment and management in Kubernetes. It runs as a Kubernetes Job to ensure successful execution in the cluster, handling the entire process in a self-contained manner.
+
+By leveraging Kubernetes Helm and running as a Kubernetes Job, the application ensures the artifacts' fetching and payload processing are performed efficiently, providing a scalable and reliable solution for this integration scenario.
 Implementation Details
 The App class is annotated with @Singleton, making it a singleton component in the application. It uses dependency injection through the @Inject annotation to obtain instances of various services and configurations defined in the application.
 
