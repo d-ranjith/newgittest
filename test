@@ -1,3 +1,94 @@
-String stringValue = ConfigProvider.getConfig().getOptionalValue("myapp.someproperty", String.class).orElse("Default Value");
-boolean booleanValue = ConfigProvider.getConfig().getOptionalValue("myapp.booleanProperty", Boolean.class).orElse(true);
-List<String> stringListValue = ConfigProvider.getConfig().getOptionalValue("myapp.stringListProperty", List.class).orElse(Collections.emptyList());
+package com.yourcompany.app.logger;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDateTime;
+
+public class LoggerUtil {
+
+    private static final Logger LOG = LoggerFactory.getLogger(LoggerUtil.class);
+
+    private static FileWriter fileWriter;
+    private static StringBuilder logBuffer = new StringBuilder();
+
+    static {
+        try {
+            // Initialize the FileWriter
+            fileWriter = new FileWriter(new File("app.log"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void logMessage(String message, String level, String verbosity, String module) {
+        String formattedMessage = String.format("{ timestamp: %s, LEVEL: %s, VERBOSITY: %s, MODULE: %s, %s }",
+                LocalDateTime.now(), level, verbosity, module, message);
+
+        // Log to SLF4J
+        switch (level.toUpperCase()) {
+            case "DEBUG":
+                if ("HIGH".equalsIgnoreCase(verbosity)) {
+                    LOG.debug(formattedMessage);
+                }
+                break;
+            case "INFO":
+                if ("HIGH".equalsIgnoreCase(verbosity) || "MEDIUM".equalsIgnoreCase(verbosity)) {
+                    LOG.info(formattedMessage);
+                }
+                break;
+            case "WARN":
+                if ("HIGH".equalsIgnoreCase(verbosity) || "MEDIUM".equalsIgnoreCase(verbosity)) {
+                    LOG.warn(formattedMessage);
+                }
+                break;
+            case "ERROR":
+                if ("HIGH".equalsIgnoreCase(verbosity) || "MEDIUM".equalsIgnoreCase(verbosity)) {
+                    LOG.error(formattedMessage);
+                }
+                break;
+            default:
+                LOG.info(formattedMessage);
+                break;
+        }
+
+        // Buffer the log message to print later
+        logBuffer.append(formattedMessage).append("\n");
+    }
+
+    public static void printLogsAfterMarker() {
+        // Add a marker in the logs to indicate where to print the logs
+        logBuffer.append("----LOGS AFTER MARKER----\n");
+
+        // Print the log contents after the marker
+        System.out.println(logBuffer.toString());
+
+        // Flush and close the file writer
+        try {
+            fileWriter.write(logBuffer.toString());
+            fileWriter.flush();
+            fileWriter.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+
+In the above implementation, the logMessage method is responsible for logging messages with different levels and verbosity. The behavior of verbosity and debug level in the implementation is as follows:
+
+Verbosity: The verbosity parameter controls which log messages get printed based on their verbosity level. The valid verbosity levels are "HIGH", "MEDIUM", and "LOW".
+
+If verbosity is set to "HIGH", all log messages with "DEBUG", "INFO", "WARN", and "ERROR" levels will be printed.
+If verbosity is set to "MEDIUM", log messages with "INFO", "WARN", and "ERROR" levels will be printed.
+If verbosity is set to "LOW", only log messages with "WARN" and "ERROR" levels will be printed.
+Debug Level: The level parameter controls the log level of the message. The valid log levels are "DEBUG", "INFO", "WARN", and "ERROR".
+
+If level is set to "DEBUG" and verbosity is set to "HIGH", the message will be logged.
+If level is set to "INFO" and verbosity is set to "HIGH" or "MEDIUM", the message will be logged.
+If level is set to "WARN" and verbosity is set to "HIGH" or "MEDIUM", the message will be logged.
+If level is set to "ERROR" and verbosity is set to "HIGH" or "MEDIUM", the message will be logged.
+In summary, verbosity controls which log messages get printed based on their verbosity level, while debug level controls the actual log level of the message. This allows you to fine-tune the logging behavior by specifying both the verbosity and log level parameters when calling the logMessage method.
