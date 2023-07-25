@@ -1,113 +1,38 @@
-The application is a Kubernetes Helm chart that runs as a Kubernetes Job. Its primary purpose is to fetch artifacts from JFrog Artifactory, extract the contents of the artifacts, and interact with an external service (ABC service) for JWT authorization. The application follows these key steps:
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
-Fetch Artifacts from JFrog Artifactory: The application connects to JFrog Artifactory using credentials (username and API key) provided as configuration. It then downloads the specified artifacts from Artifactory.
+public class Main {
 
-Extract Artifact Contents: After fetching the artifacts, the application extracts their contents. It supports both ZIP and Tar Gzipped archives, utilizing appropriate methods to extract the files.
+    public static void main(String[] args) {
+        String secretPath = "/etc/secrets/secret";
+        Map<String, String> secrets = readSecretsFromFile(secretPath);
 
-JWT Token Authorization with ABC Service: The application needs to interact with the ABC service, which requires authorization using a JWT token. The application fetches the required OAuth token from the ABC service using the provided client_id and client_secret.
+        // Set secrets as environment variables
+        for (Map.Entry<String, String> entry : secrets.entrySet()) {
+            System.setProperty(entry.getKey(), entry.getValue());
+        }
 
-Payload Acceptance: Once the artifacts are fetched, extracted, and the JWT token is acquired, the application proceeds to upload the payload to a specific API endpoint using the ABC service. It utilizes the JWT token to authorize this upload.
+        // Your Java application logic here...
+    }
 
-Kubernetes Helm Chart and K8s Job: The application is packaged as a Helm chart for easy deployment and management in Kubernetes. It runs as a Kubernetes Job to ensure successful execution in the cluster, handling the entire process in a self-contained manner.
+    private static Map<String, String> readSecretsFromFile(String filePath) {
+        Map<String, String> secrets = new HashMap<>();
 
-By leveraging Kubernetes Helm and running as a Kubernetes Job, the application ensures the artifacts' fetching and payload processing are performed efficiently, providing a scalable and reliable solution for this integration scenario.
-Implementation Details
-The App class is annotated with @Singleton, making it a singleton component in the application. It uses dependency injection through the @Inject annotation to obtain instances of various services and configurations defined in the application.
+        try {
+            Properties properties = new Properties();
+            properties.load(Files.newInputStream(Paths.get(filePath)));
 
-Methods
-run()
-The run() method is the main entry point to the application. It is called when the application starts. Within this method, the application follows a series of steps to perform its tasks. It first reads the required configuration values from the AppConfiguration instance. It then proceeds to download a file from Artifactory using ArtifactoryService, fetches an OAuth token using OAuthService, and finally uploads a payload to an API endpoint using ApiService. Additionally, the method also extracts and displays the contents of an archive using ArchiveExtractor. The extracted log messages are handled by the custom Logger class.
+            for (String key : properties.stringPropertyNames()) {
+                secrets.put(key, properties.getProperty(key));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading secrets from file: " + filePath, e);
+        }
 
-logMessage(String message, String level, String verbosity, String module)
-The logMessage() method is a utility method to log messages with varying log levels and verbosity levels. It uses the Logger class to log messages based on the specified parameters. The log message includes a timestamp, log level, verbosity level, module, and the actual message.
-
-Usage
-To run the [Project Name] application, execute the main() method in the App class. This method initializes the application and triggers the run() method, which carries out the application's tasks.
-
-Please refer to the Getting Started section of the README for instructions on how to run the application.
-
-
-[Project Name]
-[Project Name] is a [brief description of the project's purpose]. This repository contains the source code for the project and is open to contributions from the community. We encourage and welcome contributions, bug reports, and feature requests from all developers.
-
-Implementation Details
-Project Structure
-src/main/java/com/yourcompany/app/config/AppConfiguration.java: This file contains the interface AppConfiguration that defines methods to read configuration properties from application.properties.
-
-src/main/java/com/yourcompany/app/model/FormData.java: This file defines the FormData model, representing the data structure used in the application.
-
-src/main/java/com/yourcompany/app/model/OAuthToken.java: This file defines the OAuthToken model, representing the OAuth token used for authentication.
-
-src/main/java/com/yourcompany/app/service/ArtifactoryService.java: This file contains the ArtifactoryService class responsible for handling interactions with the Artifactory service.
-
-src/main/java/com/yourcompany/app/service/OAuthService.java: This file contains the OAuthService class responsible for handling OAuth authentication.
-
-src/main/java/com/yourcompany/app/service/ApiService.java: This file contains the ApiService class responsible for making API calls.
-
-src/main/java/com/yourcompany/app/web/AppResource.java: This file contains the AppResource class, which is the main RESTful web resource for the application.
-
-Resources
-src/main/resources/application.properties: This is the configuration file for the application. It contains various properties that can be customized to configure the application's behavior.
-
-src/main/resources/META-INF/resources/index.html: This file represents the index page for the web application.
-
-Getting Started
-Prerequisites
-Before you start contributing to [Project Name], make sure you have the following installed:
-
-Java Development Kit (JDK) 11 or later
-Gradle build tool
-Running the Application
-To run the application locally, follow the steps mentioned in the Getting Started section of the README.
-
-Testing
-To run the tests for [Project Name], use the following command:
-
-bash
-Copy code
-./gradlew test
-Configuration
-[Project Name] reads its configuration from the application.properties file located in the src/main/resources directory. You can modify this file to customize the behavior of the application.
-
-Contributing
-We welcome contributions from the community! If you find a bug, have an idea for a new feature, or would like to improve the project in any way, please follow the steps mentioned in the Contributing section of the README.
-
-Please ensure that your code follows our coding standards and includes appropriate tests. We will review your pull request and provide feedback as necessary.
-
-License
-[Project Name] is licensed under the [License Type] license. See the LICENSE file for more details.
-
-Thank you for considering contributing to [Project Name]. We look forward to your contributions! If you have any questions or need assistance, please don't hesitate to reach out to us. Happy coding!
-----
-
-
-To achieve the desired behavior, you can follow these steps:
-
-At the beginning of the application or when the log file is initialized, call clearLogFile() to ensure the log file is empty and ready for new log messages.
-
-Throughout the program, use logMessage() method to log messages. The log messages will be both printed to the console (based on log level and verbosity) and appended to the log file.
-
-At the end of the program's execution, call printLogsAfterMarker() to print the marker (if log messages were logged) and all the log messages after the marker. This method will ensure that the marker is only present once at the beginning of the log file.
-
-Here's the sequence of method calls:
-
-Call clearLogFile() at the start of the application (or when the log file is initialized).
-Throughout the program, use logMessage() method to log messages.
-At the end of the program's execution, call printLogsAfterMarker() to print the marker and all log messages after the marker.
-
-
-
-In the above implementation, the logMessage method is responsible for logging messages with different levels and verbosity. The behavior of verbosity and debug level in the implementation is as follows:
-
-Verbosity: The verbosity parameter controls which log messages get printed based on their verbosity level. The valid verbosity levels are "HIGH", "MEDIUM", and "LOW".
-
-If verbosity is set to "HIGH", all log messages with "DEBUG", "INFO", "WARN", and "ERROR" levels will be printed.
-If verbosity is set to "MEDIUM", log messages with "INFO", "WARN", and "ERROR" levels will be printed.
-If verbosity is set to "LOW", only log messages with "WARN" and "ERROR" levels will be printed.
-Debug Level: The level parameter controls the log level of the message. The valid log levels are "DEBUG", "INFO", "WARN", and "ERROR".
-
-If level is set to "DEBUG" and verbosity is set to "HIGH", the message will be logged.
-If level is set to "INFO" and verbosity is set to "HIGH" or "MEDIUM", the message will be logged.
-If level is set to "WARN" and verbosity is set to "HIGH" or "MEDIUM", the message will be logged.
-If level is set to "ERROR" and verbosity is set to "HIGH" or "MEDIUM", the message will be logged.
-In summary, verbosity controls which log messages get printed based on their verbosity level, while debug level controls the actual log level of the message. This allows you to fine-tune the logging behavior by specifying both the verbosity and log level parameters when calling the logMessage method.
+        return secrets;
+    }
+}
