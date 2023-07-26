@@ -1,15 +1,35 @@
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
+private static Map<String, String> readPropertiesFromFile(String filePath) {
+    Map<String, String> propertiesMap = new HashMap<>();
+
+    try {
+        Properties properties = new Properties();
+        properties.load(Files.newInputStream(Paths.get(filePath)));
+
+        for (String key : properties.stringPropertyNames()) {
+            propertiesMap.put(key, properties.getProperty(key));
+        }
+    } catch (IOException e) {
+        throw new RuntimeException("Error reading properties from file: " + filePath, e);
+    }
+
+    return propertiesMap;
+}
 
 public class Main {
 
     public static void main(String[] args) {
+        String applicationPropertiesPath = "/path/to/application.properties";
         String secretPath = "/etc/secrets/secret";
+
+        // Read properties from application.properties
+        Map<String, String> properties = readPropertiesFromFile(applicationPropertiesPath);
+
+        // Read secrets from the secret file
         Map<String, String> secrets = readSecretsFromFile(secretPath);
+
+        // Print client_id and client_secret from the secret file
+        System.out.println("client_id: " + secrets.get("client_id"));
+        System.out.println("client_secret: " + secrets.get("client_secret"));
 
         // Set secrets as environment variables
         for (Map.Entry<String, String> entry : secrets.entrySet()) {
@@ -19,20 +39,6 @@ public class Main {
         // Your Java application logic here...
     }
 
-    private static Map<String, String> readSecretsFromFile(String filePath) {
-        Map<String, String> secrets = new HashMap<>();
-
-        try {
-            Properties properties = new Properties();
-            properties.load(Files.newInputStream(Paths.get(filePath)));
-
-            for (String key : properties.stringPropertyNames()) {
-                secrets.put(key, properties.getProperty(key));
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Error reading secrets from file: " + filePath, e);
-        }
-
-        return secrets;
-    }
+    // The readSecretsFromFile method is kept as it is.
 }
+
