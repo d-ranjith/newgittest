@@ -132,17 +132,37 @@ Copy code
   "branch_name": "master",
   "helm_chart_name": "chart_name",
   "latest_version": "1.0.0",
+  "metadata": {
+    "apiVersion": "v1",
+    "kind": "Deployment",
+    "readme": "README.md",
+    "license": ["company"],
+    "tags": ["database", "apis"],
+    "enabled": true
+  },
+  "urls": {
+    "repository": "https://url...",
+    "homepage": "url",
+    "documentation": "url",
+    "issues": "url"
+  },
   "versions": [
     {
       "version": "1.0.0",
-      "created_at": "timestamp",
+      "createdBy": "username",
+      "creationTime": "2023-09-15T14:30:00.000Z",
+      "lastModifiedTime": "2023-09-16T09:45:00.000Z",
+      "triggerBranch": "master",
       "chart_data": {
         /* Helm chart data structure here */
-      }
+      },
+      "authors": ["abc", "xyz"],
+      "description": "Description of the Helm chart"
     },
     // Additional versions can be stored here
   ]
 }
+
 6. Conclusion
 Summarize the key points of the API design and highlight its objectives.
 Additional Notes
