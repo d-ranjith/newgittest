@@ -1,20 +1,151 @@
-/**
- * Converts a file size in bytes to a human-readable format with appropriate units (e.g., KB, MB, GB, TB).
- *
- * @param fileSize The size of the file in bytes to be converted.
- * @return A human-readable representation of the file size, including the appropriate unit (e.g., "2.54 MB").
- */
-private String getReadableSize(long fileSize) {
-    String[] units = {"bytes", "KB", "MB", "GB", "TB"};
-    int unitIndex = 0;
-    double size = fileSize;
+Microservice API Design Document
+1. Introduction
+Objective: This document outlines the design of the microservice API for managing Helm chart versions associated with code repositories.
 
-    // Divide the file size by 1024 until it is smaller than 1024 or until the largest unit is reached
-    while (size >= 1024 && unitIndex < units.length - 1) {
-        size /= 1024;
-        unitIndex++;
-    }
-
-    // Format the size with two decimal places and append the appropriate unit
-    return String.format("%.2f %s", size, units[unitIndex]);
+2. Authentication and Authorization
+2.1. Authentication
+Authentication Method: JWT (JSON Web Tokens)
+Token Issuer: An authentication service issues JWT tokens.
+Token Flow: Clients obtain JWT tokens through a login endpoint or a third-party authentication mechanism.
+2.2. Authorization
+Authorization Middleware: JWT tokens are used for authorization.
+Roles and Permissions: Define roles and permissions required for various API endpoints (e.g., admin, user, etc.).
+3. API Endpoints
+3.1. Create Helm Chart Version
+Endpoint: POST /chart
+Description: Create a new Helm chart version for a repository's branch.
+Request Payload:
+json
+Copy code
+{
+  "repository_name": "my-awesome-project/frontend",
+  "branch_name": "master",
+  "helm_chart_name": "chart_name",
+  "chart_data": {
+    /* Helm chart data structure here */
+  }
 }
+Response:
+HTTP Status Code: 201 Created
+json
+Copy code
+{
+  "status": "success",
+  "message": "Helm chart version created successfully."
+}
+3.2. Get Latest Helm Chart Version
+Endpoint: GET /chart/:repository_name/:branch_name/latest
+Description: Retrieve the latest Helm chart version for a specific repository and branch.
+Response:
+HTTP Status Code: 200 OK
+json
+Copy code
+{
+  "repository_name": "my-awesome-project/frontend",
+  "branch_name": "master",
+  "helm_chart_name": "chart_name",
+  "latest_version": "1.0.0",
+  "chart_data": {
+    /* Helm chart data structure here */
+  }
+}
+3.3. Get Specific Helm Chart Version
+Endpoint: GET /chart/:repository_name/:branch_name/:version
+Description: Retrieve a specific Helm chart version for a given repository, branch, and version.
+Response:
+HTTP Status Code: 200 OK
+json
+Copy code
+{
+  "repository_name": "my-awesome-project/frontend",
+  "branch_name": "master",
+  "helm_chart_name": "chart_name",
+  "version": "1.0.0",
+  "chart_data": {
+    /* Helm chart data structure here */
+  }
+}
+3.4. Update Helm Chart Version
+Endpoint: PUT /chart/:repository_name/:branch_name/:version
+Description: Update an existing Helm chart version.
+Request Payload:
+json
+Copy code
+{
+  "chart_data": {
+    /* Updated Helm chart data structure here */
+  }
+}
+Response:
+HTTP Status Code: 200 OK
+json
+Copy code
+{
+  "status": "success",
+  "message": "Helm chart version updated successfully."
+}
+3.5. Delete Helm Chart Version
+Endpoint: DELETE /chart/:repository_name/:branch_name/:version
+Description: Delete a specific Helm chart version.
+Response:
+HTTP Status Code: 204 No Content
+(No response body for successful deletion)
+3.6. Search Helm Chart Versions
+Endpoint: GET /chart/search
+Description: Search for Helm chart versions based on various criteria.
+Query Parameters:
+query (string): Search keyword.
+project (string): Filter by project name.
+page (integer): Page number for pagination.
+limit (integer): Number of results per page.
+sort (string): Sort results based on specific criteria.
+Response:
+HTTP Status Code: 200 OK
+json
+Copy code
+{
+  "results": [
+    {
+      "repository_name": "my-awesome-project/frontend",
+      "branch_name": "master",
+      "helm_chart_name": "chart_name",
+      "version": "1.0.0",
+      "chart_data": {
+        /* Helm chart data structure here */
+      }
+    },
+    // Other matching repositories
+  ]
+}
+4. Pagination and Error Handling
+Implement pagination for search results.
+Handle errors gracefully and provide informative error messages.
+5. Data Model
+The data model for Helm chart versions is as follows:
+
+json
+Copy code
+{
+  "_id": "unique_id",
+  "repository_domain": "bitbucket.com",
+  "repository_name": "my-awesome-project/frontend",
+  "branch_name": "master",
+  "helm_chart_name": "chart_name",
+  "latest_version": "1.0.0",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "created_at": "timestamp",
+      "chart_data": {
+        /* Helm chart data structure here */
+      }
+    },
+    // Additional versions can be stored here
+  ]
+}
+6. Conclusion
+Summarize the key points of the API design and highlight its objectives.
+Additional Notes
+Mention that this document is a living document subject to changes and updates as the development process progresses.
+Specify that the Agile development approach will involve iterative development, and the API may evolve based on feedback and requirements.
+In the "Data Model" section, I've included the data structure for Helm chart versions, and I've also updated the document to include the delete option for targeted versions in the API endpoints.
