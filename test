@@ -34,16 +34,25 @@ rl.question('Provide your custom manifest type name: ', (manifestTypeName) => {
                 // Close the readline interface
                 rl.close();
 
+                // Create a new version object
+                const newVersion = {
+                  version: latestVersion,
+                  createdBy: createdBy,
+                  createdTime: new Date().toISOString(),
+                  lastModifiedTime: new Date().toISOString(),
+                  branchName: 'master',
+                  enabled: true
+                };
+
+                // Push the new version data to the versions array
+                clonedData.versions.push(newVersion);
+
                 // Update the cloned data with user input
                 clonedData.name = manifestTypeName;
                 clonedData.latestVersion = latestVersion;
                 clonedData.description = description;
                 clonedData.documentation = documentation;
                 clonedData.tags = tags.split(',').map((tag) => tag.trim());
-                clonedData.versions[0].version = latestVersion;
-                clonedData.versions[0].createdBy = createdBy;
-                clonedData.versions[0].createdTime = new Date().toISOString();
-                clonedData.versions[0].lastModifiedTime = new Date().toISOString();
 
                 // Write the cloned data to a new file
                 fs.writeFileSync(destinationFilePath, JSON.stringify(clonedData, null, 2));
