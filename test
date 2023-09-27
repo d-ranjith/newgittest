@@ -1,171 +1,48 @@
-Microservice API Design Document
-1. Introduction
-Objective: This document outlines the design of the microservice API for managing Helm chart versions associated with code repositories.
+const convict = require('convict');
 
-2. Authentication and Authorization
-2.1. Authentication
-Authentication Method: JWT (JSON Web Tokens)
-Token Issuer: An authentication service issues JWT tokens.
-Token Flow: Clients obtain JWT tokens through a login endpoint or a third-party authentication mechanism.
-2.2. Authorization
-Authorization Middleware: JWT tokens are used for authorization.
-Roles and Permissions: Define roles and permissions required for various API endpoints (e.g., admin, user, etc.).
-3. API Endpoints
-3.1. Create Helm Chart Version
-Endpoint: POST /chart
-Description: Create a new Helm chart version for a repository's branch.
-Request Payload:
-json
-Copy code
-{
-  "repository_name": "my-awesome-project/frontend",
-  "branch_name": "master",
-  "helm_chart_name": "chart_name",
-  "chart_data": {
-    /* Helm chart data structure here */
-  }
-}
-Response:
-HTTP Status Code: 201 Created
-json
-Copy code
-{
-  "status": "success",
-  "message": "Helm chart version created successfully."
-}
-3.2. Get Latest Helm Chart Version
-Endpoint: GET /chart/:repository_name/:branch_name/latest
-Description: Retrieve the latest Helm chart version for a specific repository and branch.
-Response:
-HTTP Status Code: 200 OK
-json
-Copy code
-{
-  "repository_name": "my-awesome-project/frontend",
-  "branch_name": "master",
-  "helm_chart_name": "chart_name",
-  "latest_version": "1.0.0",
-  "chart_data": {
-    /* Helm chart data structure here */
-  }
-}
-3.3. Get Specific Helm Chart Version
-Endpoint: GET /chart/:repository_name/:branch_name/:version
-Description: Retrieve a specific Helm chart version for a given repository, branch, and version.
-Response:
-HTTP Status Code: 200 OK
-json
-Copy code
-{
-  "repository_name": "my-awesome-project/frontend",
-  "branch_name": "master",
-  "helm_chart_name": "chart_name",
-  "version": "1.0.0",
-  "chart_data": {
-    /* Helm chart data structure here */
-  }
-}
-3.4. Update Helm Chart Version
-Endpoint: PUT /chart/:repository_name/:branch_name/:version
-Description: Update an existing Helm chart version.
-Request Payload:
-json
-Copy code
-{
-  "chart_data": {
-    /* Updated Helm chart data structure here */
-  }
-}
-Response:
-HTTP Status Code: 200 OK
-json
-Copy code
-{
-  "status": "success",
-  "message": "Helm chart version updated successfully."
-}
-3.5. Delete Helm Chart Version
-Endpoint: DELETE /chart/:repository_name/:branch_name/:version
-Description: Delete a specific Helm chart version.
-Response:
-HTTP Status Code: 204 No Content
-(No response body for successful deletion)
-3.6. Search Helm Chart Versions
-Endpoint: GET /chart/search
-Description: Search for Helm chart versions based on various criteria.
-Query Parameters:
-query (string): Search keyword.
-project (string): Filter by project name.
-page (integer): Page number for pagination.
-limit (integer): Number of results per page.
-sort (string): Sort results based on specific criteria.
-Response:
-HTTP Status Code: 200 OK
-json
-Copy code
-{
-  "results": [
-    {
-      "repository_name": "my-awesome-project/frontend",
-      "branch_name": "master",
-      "helm_chart_name": "chart_name",
-      "version": "1.0.0",
-      "chart_data": {
-        /* Helm chart data structure here */
-      }
-    },
-    // Other matching repositories
-  ]
-}
-4. Pagination and Error Handling
-Implement pagination for search results.
-Handle errors gracefully and provide informative error messages.
-5. Data Model
-The data model for Helm chart versions is as follows:
-
-json
-Copy code
-{
-  "_id": "unique_id",
-  "repository_domain": "bitbucket.com",
-  "repository_name": "my-awesome-project/frontend",
-  "branch_name": "master",
-  "helm_chart_name": "chart_name",
-  "latest_version": "1.0.0",
-  "metadata": {
-    "apiVersion": "v1",
-    "kind": "Deployment",
-    "readme": "README.md",
-    "license": ["company"],
-    "tags": ["database", "apis"],
-    "enabled": true
-  },
-  "urls": {
-    "repository": "https://url...",
-    "homepage": "url",
-    "documentation": "url",
-    "issues": "url"
-  },
-  "versions": [
-    {
-      "version": "1.0.0",
-      "createdBy": "username",
-      "creationTime": "2023-09-15T14:30:00.000Z",
-      "lastModifiedTime": "2023-09-16T09:45:00.000Z",
-      "triggerBranch": "master",
-      "chart_data": {
-        /* Helm chart data structure here */
+const config = convict({
+  versions: {
+    doc: 'List of version objects',
+    format: Array, // Specifies that it should be an array
+    default: [], // Default value is an empty array, you can add version objects to this array
+    env: 'VERSIONS', // Optional: Environment variable name
+    children: {
+      version: {
+        doc: 'Version number',
+        format: String, // Assumes version is a string, adjust as needed
+        default: '', // Default value for the version
       },
-      "authors": ["abc", "xyz"],
-      "description": "Description of the Helm chart"
+      createdBy: {
+        doc: 'Creator of the version',
+        format: String, // Assumes createdBy is a string, adjust as needed
+        default: 'xy12345', // Default creator
+      },
+      createdTime: {
+        doc: 'Time when the version was created',
+        format: 'Date with ISO 8601 format', // Assumes createdTime is a date in ISO 8601 format
+        default: '', // Default created time
+      },
+      lastModifiedTime: {
+        doc: 'Time when the version was last modified',
+        format: 'Date with ISO 8601 format', // Assumes lastModifiedTime is a date in ISO 8601 format
+        default: '', // Default last modified time
+      },
+      branchName: {
+        doc: 'Name of the branch associated with the version',
+        format: String, // Assumes branchName is a string, adjust as needed
+        default: 'master', // Default branch name
+      },
+      enabled: {
+        doc: 'Flag indicating whether the version is enabled',
+        format: Boolean, // Specifies that it should be a boolean
+        default: true, // Default value
+      },
     },
-    // Additional versions can be stored here
-  ]
-}
+  },
+});
 
-6. Conclusion
-Summarize the key points of the API design and highlight its objectives.
-Additional Notes
-Mention that this document is a living document subject to changes and updates as the development process progresses.
-Specify that the Agile development approach will involve iterative development, and the API may evolve based on feedback and requirements.
-In the "Data Model" section, I've included the data structure for Helm chart versions, and I've also updated the document to include the delete option for targeted versions in the API endpoints.
+// Load and validate the configuration
+config.loadFile('config.json'); // Load configuration from a file (if needed)
+config.validate({ allowed: 'strict' }); // Validate the configuration
+
+// Access the properties, e.g., config.get('versions') to get the array of version objects
