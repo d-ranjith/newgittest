@@ -1,48 +1,98 @@
-const convict = require('convict');
+const readline = require('readline');
+const fs = require('fs');
+const path = require('path');
 
-const config = convict({
-  versions: {
-    doc: 'List of version objects',
-    format: Array, // Specifies that it should be an array
-    default: [], // Default value is an empty array, you can add version objects to this array
-    env: 'VERSIONS', // Optional: Environment variable name
-    children: {
-      version: {
-        doc: 'Version number',
-        format: String, // Assumes version is a string, adjust as needed
-        default: '', // Default value for the version
-      },
-      createdBy: {
-        doc: 'Creator of the version',
-        format: String, // Assumes createdBy is a string, adjust as needed
-        default: 'xy12345', // Default creator
-      },
-      createdTime: {
-        doc: 'Time when the version was created',
-        format: 'Date with ISO 8601 format', // Assumes createdTime is a date in ISO 8601 format
-        default: '', // Default created time
-      },
-      lastModifiedTime: {
-        doc: 'Time when the version was last modified',
-        format: 'Date with ISO 8601 format', // Assumes lastModifiedTime is a date in ISO 8601 format
-        default: '', // Default last modified time
-      },
-      branchName: {
-        doc: 'Name of the branch associated with the version',
-        format: String, // Assumes branchName is a string, adjust as needed
-        default: 'master', // Default branch name
-      },
-      enabled: {
-        doc: 'Flag indicating whether the version is enabled',
-        format: Boolean, // Specifies that it should be a boolean
-        default: true, // Default value
-      },
-    },
-  },
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
 });
 
-// Load and validate the configuration
-config.loadFile('config.json'); // Load configuration from a file (if needed)
-config.validate({ allowed: 'strict' }); // Validate the configuration
+// Prompt the user for the manifest type name
+rl.question('Provide your custom manifest type name: ', (manifestTypeName) => {
+  // Construct the path to the JSON file based on the manifest type name
+  const filePath = path.join('config', `${manifestTypeName}.json`);
 
-// Access the properties, e.g., config.get('versions') to get the array of version objects
+  try {
+    let jsonData;
+
+    // Check if the file exists
+    if (fs.existsSync(filePath)) {
+      // If the file exists, read and update it
+      const data = fs.readFileSync(filePath, 'utf8');
+      jsonData = JSON.parse(data);
+
+      // Prompt the user for additional values
+      rl.question('Provide the description for the manifest type: ', (description) => {
+        rl.question('Provide the README.md URL to the Bitbucket repository: ', (documentation) => {
+          rl.question('Provide tags (comma-separated): ', (tags) => {
+            rl.question('Provide createdBy (user name or DL alias): ', (createdBy) => {
+              rl.question('Provide the initial version: ', (latestVersion) => {
+                // Close the readline interface
+                rl.close();
+
+                // Update the JSON data with user input
+                jsonData.name = manifestTypeName;
+                jsonData.latestVersion = latestVersion;
+                jsonData.description = description;
+                jsonData.documentation = documentation;
+                jsonData.tags = tags.split(',').map((tag) => tag.trim());
+                jsonData.versions[0].version = latestVersion;
+                jsonData.versions[0].createdBy = createdBy;
+                jsonData.versions[0].createdTime = new Date().toISOString();
+                jsonData.versions[0].lastModifiedTime = new Date().toISOString();
+
+                // Write the updated JSON data back to the file
+                fs.writeFileSync(filePath, JSON.stringify(jsonData, null, 2));
+
+                console.log('File updated successfully.');
+                console.log('File location:', filePath);
+              });
+            });
+          });
+        });
+      });
+    } else {
+      // If the file does not exist, create a new one with prompts
+      rl.question('Provide the description for the manifest type: ', (description) => {
+        rl.question('Provide the README.md URL to the Bitbucket repository: ', (documentation) => {
+          rl.question('Provide tags (comma-separated): ', (tags) => {
+            rl.question('Provide createdBy (user name or DL alias): ', (createdBy) => {
+              rl.question('Provide the initial version: ', (latestVersion) => {
+                // Close the readline interface
+                rl.close();
+
+                // Create a new JSON object with user input
+                jsonData = {
+                  name: manifestTypeName,
+                  latestVersion: latestVersion,
+                  description: description,
+                  documentation: documentation,
+                  tags: tags.split(',').map((tag) => tag.trim()),
+                  enabled: true,
+                  versions: [
+                    {
+                      version: latestVersion,
+                      createdBy: createdBy,
+                      createdTime: new Date().toISOString(),
+                      lastModifiedTime: new Date().toISOString(),
+                      branchName: 'master',
+                      enabled: true
+                    }
+                  ]
+                };
+
+                // Write the new JSON data to a new file
+                fs.writeFileSync(filePath, JSON.stringify(jsonData, null, 2));
+
+                console.log('New file created successfully.');
+                console.log('File location:', filePath);
+              });
+            });
+          });
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error:', error.message);
+  }
+});
