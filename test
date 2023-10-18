@@ -1,9 +1,34 @@
-Throughout the past year, I have embodied the leadership principles of ownership, delivering with pride, and succeeding together in multiple ways.
+--- Financial performance rating
 
-Ownership: I have consistently taken ownership of my responsibilities and initiatives. Whether it was developing a critical API to streamline deployment or optimizing resource utilization by addressing PVC issues, I approached each task with a strong sense of ownership. This ownership extended to supporting the L3 team in repaving the Jenkins image and actively participating in management training sessions to enhance my leadership skills. By taking ownership, I ensured that every project and task I worked on was carried through to successful completion.
+Over the past year, my contributions have been directed toward optimizing our operational processes and enhancing our organization's financial performance. Through a set of well-defined goals, I have actively worked towards streamlining our deployment processes, bolstering security measures, promoting product awareness, and optimizing resource utilization.
 
-Delivering with Pride: I take immense pride in my work, ensuring that every project or task is not only completed but also completed with excellence. Whether it was designing the API for deployment, developing secure identity management solutions, or introducing Project A at Techfest, I approached each project with a commitment to delivering high-quality results. This pride in delivery is reflected in the efficiency and effectiveness of the solutions I've provided.
+In pursuit of my first goal, "Efficient Deployment Process Optimization," I took ownership of the task at hand. I successfully developed a vital API that retrieves the latest version for custom deployment, bringing about substantial reductions in the time developers spent on making changes and releasing Helm chart executors bundled with starter scripts. The resulting streamlined deployment process not only bolstered our efficiency but also contributed to direct cost savings, leaving a positive imprint on our organization's financial performance.
 
-Succeeding Together: In line with the principle of succeeding together, I have actively collaborated with colleagues, teams, and partners. For example, my efforts to streamline deployment and optimize resource utilization have benefited not only my immediate team but the entire organization. Furthermore, my involvement in Techfest contributed to increased awareness of our products, fostering a sense of shared success across teams. I have actively sought opportunities to foster collaboration and teamwork, recognizing that success is achieved most effectively when we work together.
+My second goal, "Enhanced Identity Management for Security," further exemplifies my commitment to safeguarding our financial assets. I designed a reference implementation in Java that leverages HashiCorp Vault for identity management. This solution enhances security measures and is tailored to meet identity management requirements for applications deployed in Project A. By addressing security risks and bolstering identity management, I have contributed to a safer and more secure financial environment.
 
-In the upcoming year, I remain committed to embodying these leadership principles, ensuring that ownership, pride in delivery, and teamwork continue to drive our projects and initiatives. By doing so, I believe we can collectively contribute to the organization's financial well-being and long-term success.
+"Product Awareness and Adoption" represented yet another avenue for financial impact. My active participation in Techfest, aimed at introducing Project A to a wider audience, has already begun yielding positive outcomes. The increased awareness and subsequent adoption of Project A are expected to translate into streamlined CI/CD standards and quicker releases, all of which will contribute to our organization's financial well-being.
+
+My final goal, "Optimizing Resource Utilization," encapsulates my commitment to operational excellence. I developed a script that effectively addressed the issue of stale PVCs in our Kubernetes/OpenShift environment, delivering a remarkable 30% reduction in PVC usage. This not only improved operational stability but also generated cost savings by optimizing resource utilization.
+
+In conclusion, I have aligned my efforts with the principles of efficiency, security, and fiscal responsibility, actively contributing to the financial well-being of our organization. As we embark on the upcoming year, I am eager to build on these achievements, further enhance our processes, and continue positively impacting our financial performance.
+
+
+--- client & franchise 
+
+Enhanced Leadership Skills: My participation in three management trainings, including "Motivating Your Team," "Critical Thinking Program," and "New Manager Information Session," has significantly enhanced my leadership skills. This development benefits our clients by ensuring that I can better lead teams, communicate effectively, and make informed decisions to address their needs. Clients can expect improved collaboration and guidance from me as a result.
+
+Operational Excellence: My commitment to principles of efficiency and security aligns directly with our client outcomes. By streamlining deployment processes and enhancing security measures, I'm contributing to the operational excellence that our clients expect. The efficient delivery of services, paired with strong security, ensures that clients receive high-quality results and have confidence in our offerings.
+
+Continuous Improvement: Clients can anticipate ongoing enhancements in the services we provide. My dedication to continuous learning and development ensures that I stay updated with industry best practices and new insights. This commitment to improvement directly benefits our clients, as they receive services that are constantly evolving to meet their changing needs.
+
+Franchise Outcome Goals:
+
+Enhanced Leadership Skills: As a manager in the franchise system, my improved leadership skills directly benefit the franchise's operational efficiency. It means better guidance for franchisees, improved team motivation, and more informed decision-making. This, in turn, leads to a positive impact on the franchise's growth and success.
+
+Operational Excellence: The principles of efficiency and security that I've championed align closely with the franchise's operational objectives. The optimization of deployment processes and the reinforcement of security measures help to ensure consistent, reliable service delivery for franchisees. This contributes to the franchise's reputation and success.
+
+Talent Acquisition and Diversity: Interviewing diverse candidates for the L3 team and referring one candidate to the company have a two-fold impact. Firstly, it broadens the talent pool for the franchise, potentially leading to the acquisition of skilled individuals who can drive growth and innovation. Secondly, it demonstrates a commitment to diversity and inclusion, which can positively impact the franchise's image and brand.
+
+In conclusion, my personal and professional development, the commitment to efficiency, security, and continuous learning, and my involvement in talent acquisition and diversity efforts all contribute to better client and franchise outcomes. These outcomes include improved leadership, operational excellence, and the cultivation of a diverse and talented workforce, all of which are essential for the success of our clients and franchise.
+
+---
