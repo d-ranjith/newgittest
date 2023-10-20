@@ -5,7 +5,7 @@ synkscan() {
     local thresholdvalue="$1"  # The severity threshold value passed as an argument
 
     # Convert thresholdvalue to lowercase for case-insensitive comparison
-    local thresholdvalue_lower=$(echo "$thresholdvalue" | tr '[:upper:]' '[:lower:]')
+    local thresholdvalue_lower="${thresholdvalue,,}"
 
     # Check if "release" is set to "true"
     if [ "$release" = "true" ]; then
@@ -18,7 +18,7 @@ synkscan() {
 }
 
 # Check if the variable has a value and is one of "low," "high," "medium," or "critical."
-if [ -n "${severity_threshold}" ] && { [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "low" ] || [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "high" ] || [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "medium" ] || [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "critical" ]; }; then
+if [ -n "${severity_threshold}" ] && { [ "${severity_threshold,,}" = "low" ] || [ "${severity_threshold,,}" = "high" ] || [ "${severity_threshold,,}" = "medium" ] || [ "${severity_threshold,,}" = "critical" ]; }; then
     # Call the modified dosomething() function
     synkscan "${severity_threshold}"
 
