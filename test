@@ -1,31 +1,39 @@
---- Financial performance rating
+#!/bin/bash
 
-In the past year, I dedicated myself to enhancing our organization's financial performance through a range of well-defined goals and initiatives. My primary focus was on optimizing operational processes, which included streamlining deployment procedures, fortifying security measures, promoting product awareness, and optimizing resource utilization.
+# Define the synkscan function
+synkscan() {
+    local thresholdvalue="$1"  # The severity threshold value passed as an argument
 
-The achievement of my first goal, "Efficient Deployment Process Optimization," was marked by the successful development of a critical API designed to expedite custom deployment. This innovation significantly reduced the time developers previously spent on making changes and releasing Helm chart executors. The outcome was a streamlined deployment process that not only increased efficiency but also directly translated into cost savings, positively impacting our financial performance.
+    # Check if "release" is set to "true"
+    if [ "$release" = "true" ]; then
+        # If it is true, use snyk CLI with --severity-threshold
+        snyk test --severity-threshold="$thresholdvalue"
+    else
+        # If "release" is not "true," use snyk CLI without --severity-threshold
+        snyk test
+    fi
+}
 
-My second goal, "Enhanced Identity Management for Security," underscored my commitment to safeguarding our financial assets. I designed a Java-based reference implementation that harnessed HashiCorp Vault for identity management. This solution fortified security and catered to identity management needs in Project A, ensuring a more secure financial environment.
+# Check if the variable has a value and is one of "low," "high," "medium," or "critical."
+if [ -n "$your_variable" ] && { [ "$your_variable" = "low" ] || [ "$your_variable" = "high" ] || [ "$your_variable" = "medium" ] || [ "$your_variable" = "critical" ]; }; then
+    # Call the modified dosomething() function
+    synkscan "$your_variable"
 
-Another pivotal goal was to promote "Product Awareness and Adoption." Active participation in Techfest aimed to introduce Project A to a wider audience, and it has already begun yielding positive results. The increased awareness and adoption of Project A are anticipated to streamline our CI/CD standards, expedite releases, and enhance our organization's financial well-being.
+    # Check the exit code of synkscan
+    if [ $? -ne 0 ]; then
+        # synkscan failed, so set -e to exit the script
+        set -e
+    fi
+else
+    # If the variable is not defined or doesn't have a valid value, assign it "critical"
+    your_variable="critical"
 
-Lastly, my dedication to "Optimizing Resource Utilization" resulted in the development of a script that effectively tackled the issue of stale PVCs in our Kubernetes/OpenShift environment. This solution not only improved operational stability but also delivered substantial cost savings by optimizing resource utilization.
+    # Call the modified dosomething() function
+    synkscan "$your_variable"
 
-In summary, my unwavering commitment to principles of efficiency, security, and fiscal responsibility has actively contributed to our organization's financial health. As we enter the upcoming year, I am enthusiastic about building upon these achievements, further refining our processes, and continuing to positively impact our financial performance.
+    # Reset -e to continue the script execution even if synkscan fails
+    set +e
+fi
 
---- client & franchise 
-
-Over the past year, I have made significant strides in enhancing my leadership skills through active participation in three management training programs, namely "Motivating Your Team," "Critical Thinking Program," and "New Manager Information Session." These newfound skills directly benefit our clients by enabling me to lead teams more effectively, enhance communication, and make informed decisions tailored to their needs. As a result, clients can expect improved collaboration and guidance from me.
-
-Additionally, I've been steadfast in upholding principles of operational excellence, which directly align with our client-focused outcomes. By streamlining deployment processes and fortifying security measures, I've contributed to the operational excellence that our clients rightfully anticipate. This efficient service delivery, coupled with robust security practices, ensures that our clients receive high-quality results and can place full confidence in our offerings.
-
-Furthermore, my unwavering commitment to continuous learning and development promises ongoing enhancements in the services we provide to our clients. This dedication ensures that I stay informed about industry best practices and the latest insights, allowing us to continually evolve our services to meet our clients' ever-changing needs.
-
-When it comes to our franchise outcomes, my investment in leadership skills translates to tangible benefits for the franchise's operational efficiency. As a manager within the franchise system, my improved leadership capabilities empower me to offer better guidance to franchisees, boost team motivation, and make more informed decisions. This directly influences the franchise's growth and success.
-
-In addition, the principles of efficiency and security that I've championed directly align with the franchise's operational goals. The optimization of deployment processes and the reinforcement of security measures help ensure consistent, reliable service delivery to franchisees, bolstering the franchise's reputation and overall success.
-
-Lastly, my involvement in talent acquisition and diversity initiatives carries a dual impact. It not only broadens the talent pool for the franchise, potentially leading to the acquisition of skilled individuals who can drive growth and innovation, but it also showcases our commitment to diversity and inclusion. This commitment positively influences the franchise's image and brand.
-
-In conclusion, my dedication to personal and professional development, coupled with a commitment to operational excellence and ongoing learning, and my active engagement in talent acquisition and diversity efforts, collectively contribute to improved client and franchise outcomes. These outcomes include enhanced leadership, operational excellence, and the cultivation of a diverse and talented workforce—essential components for the success of our clients and franchise.--- Risk and control rating
-
-In terms of risk and control rating, my self-evaluation extends beyond my core responsibilities. I actively engaged in endeavors that held the potential for both risk and control enhancement. Supporting the L3 team in repaving the Jenkins image in production, while not a part of my primary role, was aimed at improving our Jenkins infrastructure. This undertaking carried the risk of disruption, but it also bolstered control by building expertise within the L3 team, empowering them for self-support in the future. Additionally, my participation in the support rota system to resolve Project A issues may have introduced a level of risk due to the unpredictability of such issues. However, it significantly contributed to control by ensuring the timely resolution of critical problems. My reviews of several PRs raised by the L3 team on bug fixes to the classic product further exemplified my commitment to maintaining control and stability within our systems, even when venturing outside my immediate responsibilities.
+# Continue with the rest of your script
+echo "The script continues..."
