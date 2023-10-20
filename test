@@ -4,10 +4,13 @@
 synkscan() {
     local thresholdvalue="$1"  # The severity threshold value passed as an argument
 
+    # Convert thresholdvalue to lowercase for case-insensitive comparison
+    local thresholdvalue_lower=$(echo "$thresholdvalue" | tr '[:upper:]' '[:lower:]')
+
     # Check if "release" is set to "true"
     if [ "$release" = "true" ]; then
         # If it is true, use snyk CLI with --severity-threshold
-        snyk test --severity-threshold="$thresholdvalue"
+        snyk test --severity-threshold="$thresholdvalue_lower"
     else
         # If "release" is not "true," use snyk CLI without --severity-threshold
         snyk test
@@ -15,9 +18,9 @@ synkscan() {
 }
 
 # Check if the variable has a value and is one of "low," "high," "medium," or "critical."
-if [ -n "$your_variable" ] && { [ "$your_variable" = "low" ] || [ "$your_variable" = "high" ] || [ "$your_variable" = "medium" ] || [ "$your_variable" = "critical" ]; }; then
+if [ -n "${severity_threshold}" ] && { [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "low" ] || [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "high" ] || [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "medium" ] || [ "$(echo "${severity_threshold}" | tr '[:upper:]' '[:lower:]')" = "critical" ]; }; then
     # Call the modified dosomething() function
-    synkscan "$your_variable"
+    synkscan "${severity_threshold}"
 
     # Check the exit code of synkscan
     if [ $? -ne 0 ]; then
@@ -26,10 +29,10 @@ if [ -n "$your_variable" ] && { [ "$your_variable" = "low" ] || [ "$your_variabl
     fi
 else
     # If the variable is not defined or doesn't have a valid value, assign it "critical"
-    your_variable="critical"
+    severity_threshold="critical"
 
     # Call the modified dosomething() function
-    synkscan "$your_variable"
+    synkscan "${severity_threshold}"
 
     # Reset -e to continue the script execution even if synkscan fails
     set +e
