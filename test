@@ -1,42 +1,15 @@
-#!/bin/bash
+# Find the latest .json file and assign its path to a variable
+latest_json_file=$(find /path/to/search -name "*.json" -type f -exec ls -t {} + | head -n 1)
 
-# Define the synkscan function
-synkscan() {
-    local thresholdvalue="$1"  # The severity threshold value passed as an argument
+# Check if a .json file was found
+if [ -n "$latest_json_file" ]; then
+    echo "Latest JSON file is: $latest_json_file"
 
-    # Convert thresholdvalue to lowercase for case-insensitive comparison
-    local thresholdvalue_lower="${thresholdvalue,,}"
+    # Now you can use $latest_json_file as needed in your script
+    # For example, to read its contents:
+    json_contents=$(cat "$latest_json_file")
 
-    # Check if "release" is set to "true"
-    if [ "$release" = "true" ]; then
-        # If it is true, use snyk CLI with --severity-threshold
-        snyk test --severity-threshold="$thresholdvalue_lower"
-    else
-        # If "release" is not "true," use snyk CLI without --severity-threshold
-        snyk test
-    fi
-}
-
-# Check if the variable has a value and is one of "low," "high," "medium," or "critical."
-if [ -n "${severity_threshold}" ] && { [ "${severity_threshold,,}" = "low" ] || [ "${severity_threshold,,}" = "high" ] || [ "${severity_threshold,,}" = "medium" ] || [ "${severity_threshold,,}" = "critical" ]; }; then
-    # Call the modified dosomething() function
-    synkscan "${severity_threshold}"
-
-    # Check the exit code of synkscan
-    if [ $? -ne 0 ]; then
-        # synkscan failed, so set -e to exit the script
-        set -e
-    fi
+    # Or perform other operations with it
 else
-    # If the variable is not defined or doesn't have a valid value, assign it "critical"
-    severity_threshold="critical"
-
-    # Call the modified dosomething() function
-    synkscan "${severity_threshold}"
-
-    # Reset -e to continue the script execution even if synkscan fails
-    set +e
+    echo "No .json files found in the specified directory."
 fi
-
-# Continue with the rest of your script
-echo "The script continues..."
