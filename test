@@ -116,3 +116,19 @@ result=$(compute_exit_code "$snyk_command" "$snyk_output_file")
 # Access the 'result' variable generated in 'main.sh'
 echo "Result JSON: $result"
 
+
+---
+# Read the first line from LastScanReport.txt
+text=$(head -n 1 LastScanReport.txt)
+
+# Extract the number using grep and sed
+number=$(echo "$text" | grep -o -E '[0-9]+' | sed -n '2p')
+
+# Process the extracted number
+if [ -n "$number" ]; then
+    echo "Extracted number: $number"
+    # Add your processing logic here
+else
+    echo "Number not found in the first line of LastScanReport.txt."
+fi
+
