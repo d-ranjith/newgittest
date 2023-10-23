@@ -1,15 +1,20 @@
-# Find the latest .json file and assign its path to a variable
-latest_json_file=$(find /path/to/search -name "*.json" -type f -exec ls -t {} + | head -n 1)
+#!/bin/bash
 
-# Check if a .json file was found
-if [ -n "$latest_json_file" ]; then
-    echo "Latest JSON file is: $latest_json_file"
+my_function() {
+    # Find the latest JSON file and assign its path to a variable
+    latest_file_json=$(ls -t *.json 2>/dev/null | head -n 1)
+    
+    if [ -n "$latest_file_json" ]; then
+        echo "Latest JSON file is: $latest_file_json"
+        
+        # Read the contents of the JSON file and assign it to the variable
+        latest_file_json_contents=$(<"$latest_file_json")
+        
+        # Now you can use $latest_file_json_contents as needed within this function
+    else
+        echo "No .json files found in the current directory."
+    }
+}
 
-    # Now you can use $latest_json_file as needed in your script
-    # For example, to read its contents:
-    json_contents=$(cat "$latest_json_file")
-
-    # Or perform other operations with it
-else
-    echo "No .json files found in the specified directory."
-fi
+# Call the function
+my_function
