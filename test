@@ -1,20 +1,23 @@
-#!/bin/bash
+# Run the Snyk scan, capture the output, and display it on the console
+snyk_output=$(snyk scan your-project | tee snyk_report.txt)
 
-my_function() {
-    # Find the latest JSON file and assign its path to a variable
-    latest_file_json=$(ls -t *.json 2>/dev/null | head -n 1)
-    
-    if [ -n "$latest_file_json" ]; then
-        echo "Latest JSON file is: $latest_file_json"
-        
-        # Read the contents of the JSON file and assign it to the variable
-        latest_file_json_contents=$(<"$latest_file_json")
-        
-        # Now you can use $latest_file_json_contents as needed within this function
-    else
-        echo "No .json files found in the current directory."
-    }
-}
+# Capture the exit code
+exit_code=$?
 
-# Call the function
-my_function
+# Initialize a variable to count vulnerabilities
+vulnerability_count=0
+
+if [ $exit_code -eq 0 ]; then
+    result='{"status": "success", "message": "Snyk scan was successful; no vulnerabilities found.", "exit_code": '$exit_code', "vulnerability_count": '$vulnerability_count'}'
+else
+    # Snyk scan failed; vulnerabilities found.
+    # Extract the vulnerability count from the Snyk output.
+    vulnerability_count=$(grep -c "Vulnerability ID:" snyk_report.txt)
+    result='{"status": "failure", "message": "Snyk scan failed; '$vulnerability_count' vulnerabilities found.", "exit_code": '$exit_code', "vulnerability_count": '$vulnerability_count', "details": '$snyk_output'}'
+fi
+
+# Output the JSON blob
+echo $result
+
+# Clean up: Remove the text file
+rm snyk_report.txt
