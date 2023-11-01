@@ -1,134 +1,39 @@
-# Run the Snyk scan, capture the output, and display it on the console
-snyk_output=$(snyk scan your-project | tee snyk_report.txt)
+# Define the path to the main folder containing subfolders for different software.
+$softwareFolder = "C:\Path\To\MainFolder"
 
-# Capture the exit code
-exit_code=$?
+# Display a menu to the user to select software.
+Write-Host "Select the software to run:`n"
 
-# Initialize a variable to count vulnerabilities
-vulnerability_count=0
+# Initialize a counter for menu numbering.
+$counter = 1
 
-if [ $exit_code -eq 0 ]; then
-    result='{"status": "success", "message": "Snyk scan was successful; no vulnerabilities found.", "exit_code": '$exit_code', "vulnerability_count": '$vulnerability_count'}'
-else
-    # Snyk scan failed; vulnerabilities found.
-    # Extract the vulnerability count from the Snyk output.
-    vulnerability_count=$(grep -c "Vulnerability ID:" snyk_report.txt)
-    result='{"status": "failure", "message": "Snyk scan failed; '$vulnerability_count' vulnerabilities found.", "exit_code": '$exit_code', "vulnerability_count": '$vulnerability_count', "details": '$snyk_output'}'
-fi
+# Get a list of subfolders within the main folder.
+$softwareSubfolders = Get-ChildItem -Path $softwareFolder -Directory
 
-# Output the JSON blob
-echo $result
-
-# Clean up: Remove the text file
-rm snyk_report.txt
-
-
-
-# Function to run a command, capture the exit code, and generate result JSON
-compute_exit_code() {
-    local command_to_run="$1"
-    local snyk_output_file="$2"
-    local exit_code=0
-    local result
-
-    # Run the specified command, capture the output, and display it on the console
-    $command_to_run | tee "$snyk_output_file"
-
-    # Capture the exit code of the command
-    exit_code=$?
-
-    # Initialize a variable to count vulnerabilities
-    vulnerability_count=0
-
-    if [ $exit_code -eq 0 ]; then
-        result='{"status": "success", "message": "Command was successful; no vulnerabilities found.", "exit_code": '"$exit_code"', "vulnerability_count": '"$vulnerability_count"'}'
-    else
-        # Command failed; vulnerabilities found.
-        # Extract the vulnerability count from the output file.
-        vulnerability_count=$(grep -c "Vulnerability ID:" "$snyk_output_file")
-        result='{"status": "failure", "message": "Command failed; '"$vulnerability_count"' vulnerabilities found.", "exit_code": '"$exit_code"', "vulnerability_count": '"$vulnerability_count"', "details": '"$(cat "$snyk_output_file")"'}'
-    fi
-
-    # Return the computed result JSON
-    echo "$result"
+# Display a numbered list of software.
+foreach ($subfolder in $softwareSubfolders) {
+    Write-Host "[$counter] $($subfolder.Name)"
+    $counter++
 }
 
-# Example usage:
-snyk_command="snyk scan your-project"
-snyk_output_file="snyk_report.txt"
+# Prompt the user to select software by entering the corresponding number.
+$selection = Read-Host "Enter the number of the software to run"
 
-# Call the function to run the Snyk scan, capture the exit code, and generate result JSON
-result=$(compute_exit_code "$snyk_command" "$snyk_output_file")
-
-# Access the 'result' variable outside the function
-echo "Result JSON: $result"
-
-=====
-
-#!/bin/bash
-
-# Source the 'snykcommand.sh' script to make the Snyk scan command available
-source /var/tmp/snykcommand.sh
-
-# Define project-specific variables
-name="your-project"
-build="your-build"
-# Add more variables as needed
-
-# Construct the Snyk scan command with variables
-snyk_command="snyk scan 'project'='$name' build='$build'"
-
-# Function to run a command, capture the exit code, and generate result JSON
-compute_exit_code() {
-    local command_to_run="$1"
-    local snyk_output_file="$2"
-    local exit_code=0
-    local result
-
-    # Run the specified command, capture the output, and display it on the console
-    $command_to_run | tee "$snyk_output_file"
-
-    # Capture the exit code of the command
-    exit_code=$?
-
-    # Initialize a variable to count vulnerabilities
-    vulnerability_count=0
-
-    if [ $exit_code -eq 0 ]; then
-        result='{"status": "success", "message": "Command was successful; no vulnerabilities found.", "exit_code": '"$exit_code"', "vulnerability_count": '"$vulnerability_count"'}'
-    else
-        # Command failed; vulnerabilities found.
-        # Extract the vulnerability count from the output file.
-        vulnerability_count=$(grep -c "Vulnerability ID:" "$snyk_output_file")
-        result='{"status": "failure", "message": "Command failed; '"$vulnerability_count"' vulnerabilities found.", "exit_code": '"$exit_code"', "vulnerability_count": '"$vulnerability_count"', "details": '"$(cat "$snyk_output_file")"'}'
-    fi
-
-    # Return the computed result JSON
-    echo "$result"
+# Ensure the selection is a valid number.
+if ($selection -lt 1 -or $selection -ge $counter) {
+    Write-Host "Invalid selection."
+    exit
 }
 
-# Example usage:
-snyk_output_file="snyk_report.txt"
+# Navigate to the selected subfolder.
+$selectedSubfolder = $softwareSubfolders[$selection - 1].FullName
+Set-Location -Path $selectedSubfolder
 
-# Call the function from 'main.sh' to run the dynamically constructed Snyk scan command and capture the exit code and generate result JSON
-result=$(compute_exit_code "$snyk_command" "$snyk_output_file")
+# Run the command for the selected software.
+# Replace the following line with the actual command to run.
+# For example: Start-Process -FilePath "software.exe"
+Write-Host "Running the command for $($selectedSubfolder)`n"
 
-# Access the 'result' variable generated in 'main.sh'
-echo "Result JSON: $result"
-
-
----
-# Read the first line from LastScanReport.txt
-text=$(head -n 1 LastScanReport.txt)
-
-# Extract the number using grep and sed
-number=$(echo "$text" | grep -o -E '[0-9]+' | sed -n '2p')
-
-# Process the extracted number
-if [ -n "$number" ]; then
-    echo "Extracted number: $number"
-    # Add your processing logic here
-else
-    echo "Number not found in the first line of LastScanReport.txt."
-fi
+# Pause to keep the PowerShell window open.
+Read-Host "Press Enter to continue"
 
