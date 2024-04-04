@@ -1,39 +1,30 @@
-# Define the path to the main folder containing subfolders for different software.
-$softwareFolder = "C:\Path\To\MainFolder"
+import requests
+import time
+import urllib3
+import logging
 
-# Display a menu to the user to select software.
-Write-Host "Select the software to run:`n"
+# Disable urllib3 warnings
+urllib3.disable_warnings()
 
-# Initialize a counter for menu numbering.
-$counter = 1
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Get a list of subfolders within the main folder.
-$softwareSubfolders = Get-ChildItem -Path $softwareFolder -Directory
+pipelineType = 'ls-pipeline-factory'
 
-# Display a numbered list of software.
-foreach ($subfolder in $softwareSubfolders) {
-    Write-Host "[$counter] $($subfolder.Name)"
-    $counter++
-}
+values_file = "values.txt"
+url = 'https://myapp/v2beta1/projects/<projectname>/pipelines'
+headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': "Basic XXXXX"}
+certificate_path = 'C:/users/<myname>/dot.pem'
 
-# Prompt the user to select software by entering the corresponding number.
-$selection = Read-Host "Enter the number of the software to run"
-
-# Ensure the selection is a valid number.
-if ($selection -lt 1 -or $selection -ge $counter) {
-    Write-Host "Invalid selection."
-    exit
-}
-
-# Navigate to the selected subfolder.
-$selectedSubfolder = $softwareSubfolders[$selection - 1].FullName
-Set-Location -Path $selectedSubfolder
-
-# Run the command for the selected software.
-# Replace the following line with the actual command to run.
-# For example: Start-Process -FilePath "software.exe"
-Write-Host "Running the command for $($selectedSubfolder)`n"
-
-# Pause to keep the PowerShell window open.
-Read-Host "Press Enter to continue"
-
+with open(values_file, "r") as file:
+    for line in file:
+        value = line.strip()
+        data = {"spec": {"pipelineName": value, "pipelineType": pipelineType}}
+        logging.info(f"Current project: {value}")
+        try:
+            response = requests.patch(url, json=data, headers=headers, verify=certificate_path)
+            response.raise_for_status()  # Raise error for non-2xx status codes
+            logging.info(response.json())
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Error occurred: {e}")
+        time.sleep(1)
