@@ -2,6 +2,7 @@ import requests
 import time
 import urllib3
 import logging
+import csv
 
 # Disable urllib3 warnings
 urllib3.disable_warnings()
@@ -9,22 +10,30 @@ urllib3.disable_warnings()
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-pipelineType = 'ls-pipeline-factory'
-
-values_file = "values.txt"
 url = 'https://myapp/v2beta1/projects/<projectname>/pipelines'
 headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': "Basic XXXXX"}
 certificate_path = 'C:/users/<myname>/dot.pem'
 
-with open(values_file, "r") as file:
-    for line in file:
-        value = line.strip()
-        data = {"spec": {"pipelineName": value, "pipelineType": pipelineType}}
-        logging.info(f"Current project: {value}")
-        try:
-            response = requests.patch(url, json=data, headers=headers, verify=certificate_path)
-            response.raise_for_status()  # Raise error for non-2xx status codes
-            logging.info(response.json())
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Error occurred: {e}")
-        time.sleep(1)
+with open("values.txt", newline='') as file:
+    reader = csv.reader(file)
+    row = next(reader)
+    id, proj, pipelineName, pipelineType = row
+
+    data = {
+        "spec": {
+            "id": id,
+            "proj": proj,
+            "pipelineName": pipelineName,
+            "pipelineType": pipelineType,
+            "versioningMode": "auto"
+        }
+    }
+
+    logging.info(f"Data: {data}")
+
+    try:
+        response = requests.patch(url, json=data, headers=headers, verify=certificate_path)
+        response.raise_for_status()  # Raise error for non-2xx status codes
+        logging.info(response.json())
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Error occurred: {e}")
