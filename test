@@ -1,39 +1,71 @@
-import requests
-import time
-import urllib3
-import logging
-import csv
+from kubernetes import client, config
+import argparse
 
-# Disable urllib3 warnings
-urllib3.disable_warnings()
+def get_all_namespaces():
+    config.load_kube_config()  # Load Kubernetes config from default location or kubeconfig file
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    v1 = client.CoreV1Api()
 
-url = 'https://myapp/v2beta1/projects/<projectname>/pipelines'
-headers = {'Content-Type': 'application/json', 'Accept': 'application/json', 'Authorization': "Basic XXXXX"}
-certificate_path = 'C:/users/<myname>/dot.pem'
+    namespaces = v1.list_namespace().items
+    return [namespace.metadata.name for namespace in namespaces]
 
-with open("values.txt", newline='') as file:
-    reader = csv.reader(file)
-    row = next(reader)
-    id, proj, pipelineName, pipelineType = row
+def get_configmaps_in_namespace(namespace):
+    config.load_kube_config()  # Load Kubernetes config from default location or kubeconfig file
 
-    data = {
-        "spec": {
-            "id": id,
-            "proj": proj,
-            "pipelineName": pipelineName,
-            "pipelineType": pipelineType,
-            "versioningMode": "auto"
-        }
-    }
-
-    logging.info(f"Data: {data}")
+    v1 = client.CoreV1Api()
 
     try:
-        response = requests.patch(url, json=data, headers=headers, verify=certificate_path)
-        response.raise_for_status()  # Raise error for non-2xx status codes
-        logging.info(response.json())
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Error occurred: {e}")
+        configmaps = v1.list_namespaced_config_map(namespace=namespace).items
+        return [configmap.metadata.name for configmap in configmaps]
+    except client.rest.ApiException as e:
+        print(f"Error listing ConfigMaps in namespace {namespace}: {e}")
+        return []
+
+def find_residual_configmaps(configmaps_used, all_configmaps):
+    residual_configmaps = [configmap for configmap in all_configmaps if configmap not in configmaps_used]
+    return residual_configmaps
+
+def list_residual_configmaps(residual_configmaps, namespace):
+    print(f"Residual ConfigMaps not used in Tekton Pipelines/Tasks in namespace {namespace}:")
+    for configmap_name in residual_configmaps:
+        print(configmap_name)
+
+def delete_residual_configmaps(residual_configmaps, namespace, output_file):
+    deleted_configmaps = []
+    config.load_kube_config()  # Load Kubernetes config from default location or kubeconfig file
+
+    v1 = client.CoreV1Api()
+    for configmap_name in residual_configmaps:
+        try:
+            v1.delete_namespaced_config_map(name=configmap_name, namespace=namespace)
+            deleted_configmaps.append((configmap_name, namespace))
+            print(f"Deleted ConfigMap: {configmap_name} in namespace {namespace}")
+        except client.rest.ApiException as e:
+            print(f"Error deleting ConfigMap {configmap_name} in namespace {namespace}: {e}")
+
+    if output_file:
+        with open(output_file, "a") as file:
+            for configmap_name, namespace in deleted_configmaps:
+                file.write(f"{configmap_name} in namespace {namespace}\n")
+        print(f"Deleted ConfigMaps written to {output_file}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Find and delete residual ConfigMaps not used in Tekton Pipelines/Tasks in all namespaces")
+    parser.add_argument("input_file", help="Path to the file containing Tekton Pipeline ConfigMaps")
+    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run to list the residual ConfigMaps")
+    parser.add_argument("--delete", action="store_true", help="Delete the residual ConfigMaps")
+    parser.add_argument("--output-file", help="Path to the output file to record deleted ConfigMaps")
+    args = parser.parse_args()
+
+    with open(args.input_file, "r") as file:
+        configmaps_used = [line.strip() for line in file]
+
+    all_namespaces = get_all_namespaces()
+
+    for namespace in all_namespaces:
+        configmaps_in_namespace = get_configmaps_in_namespace(namespace)
+        residual_configmaps = find_residual_configmaps(configmaps_used, configmaps_in_namespace)
+        if args.dry_run:
+            list_residual_configmaps(residual_configmaps, namespace)
+        elif args.delete:
+            delete_residual_configmaps(residual_configmaps, namespace, args.output_file)
