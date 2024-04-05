@@ -1,4 +1,5 @@
 from kubernetes import client, config
+import os
 import argparse
 
 def get_all_namespaces():
@@ -49,13 +50,44 @@ def delete_residual_configmaps(residual_configmaps, namespace, output_file):
                 file.write(f"{configmap_name} in namespace {namespace}\n")
         print(f"Deleted ConfigMaps written to {output_file}")
 
+def select_cluster_and_user(kubeconfig_path, cluster_name, user_name):
+    if not os.path.exists(kubeconfig_path):
+        print(f"Config file {kubeconfig_path} not found.")
+        return
+
+    config.load_kube_config(config_file=kubeconfig_path)
+
+    kube_config = config.list_kube_config_contexts()
+    selected_context = None
+
+    for context in kube_config:
+        if context['name'] == cluster_name:
+            selected_context = context
+            break
+
+    if selected_context:
+        config.load_kube_config(config_file=kubeconfig_path, context=selected_context['name'])
+
+        # Set the specified user
+        if user_name:
+            config.load_kube_config(config_file=kubeconfig_path, context=selected_context['name'], user=user_name)
+    else:
+        print(f"Cluster with name '{cluster_name}' not found in the kubeconfig.")
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Find and delete residual ConfigMaps not used in Tekton Pipelines/Tasks in all namespaces")
+    parser = argparse.ArgumentParser(description="Find and delete residual ConfigMaps not used in Tekton Pipelines/Tasks in a specific cluster")
     parser.add_argument("input_file", help="Path to the file containing Tekton Pipeline ConfigMaps")
+    parser.add_argument("--kubeconfig", help="Path to the kubeconfig file")
+    parser.add_argument("--cluster-name", required=True, help="Name of the cluster to target in the kubeconfig")
+    parser.add_argument("--user-name", help="Name of the user to use for authentication (optional)")
     parser.add_argument("--dry-run", action="store_true", help="Perform a dry run to list the residual ConfigMaps")
     parser.add_argument("--delete", action="store_true", help="Delete the residual ConfigMaps")
     parser.add_argument("--output-file", help="Path to the output file to record deleted ConfigMaps")
     args = parser.parse_args()
+
+    kubeconfig_path = args.kubeconfig or os.getenv("KUBECONFIG", os.path.expanduser("~/.kube/config"))
+
+    select_cluster_and_user(kubeconfig_path, args.cluster_name, args.user_name)
 
     with open(args.input_file, "r") as file:
         configmaps_used = [line.strip() for line in file]
@@ -69,3 +101,11 @@ if __name__ == "__main__":
             list_residual_configmaps(residual_configmaps, namespace)
         elif args.delete:
             delete_residual_configmaps(residual_configmaps, namespace, args.output_file)
+
+python script.py input_file --kubeconfig /path/to/kubeconfig --cluster-name your_cluster --dry-run
+python script.py input_file --kubeconfig /path/to/kubeconfig --cluster-name your_cluster --delete --output-file output_file
+python script.py input_file --kubeconfig /path/to/kubeconfig --cluster-name your_cluster --user-name your_user --dry-run
+python script.py input_file --cluster-name your_cluster --delete --output-file output_file
+
+
+
