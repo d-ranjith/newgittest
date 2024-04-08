@@ -1,50 +1,101 @@
-import os
-import subprocess
-import argparse
+#!/bin/bash
 
-def get_all_namespaces():
-    namespaces = []
+dry_run=false
+delete=false
+audit_dir="audit_logs"
+batch_size=50  # Adjust batch size as needed
 
-    # Run 'oc get projects' command to list all projects (namespaces) in OpenShift
-    result = subprocess.run(["oc", "get", "projects", "-o", "json"], capture_output=True, text=True)
-    if result.returncode == 0:
-        projects_data = result.stdout
-        for item in projects_data['items']:
-            namespaces.append(item['metadata']['name'])
-    else:
-        print("Error listing projects.")
+usage() {
+    echo "Usage: $0 [-d] [-D]"
+    echo "Options:"
+    echo "  -d  Dry run: List deltas without deleting"
+    echo "  -D  Delete deltas and log to audit file"
+    exit 1
+}
 
-    return namespaces
+while getopts "dD" option; do
+    case "$option" in
+        d) dry_run=true ;;
+        D) delete=true ;;
+        *) usage ;;
+    esac
+done
 
-def get_configmaps_in_namespace(namespace):
-    configmaps = []
+# Ensure audit directory exists
+mkdir -p $audit_dir
 
-    # Run 'oc get configmaps -n <namespace>' command to list configmaps in the specified namespace
-    result = subprocess.run(["oc", "get", "configmaps", "-n", namespace, "-o", "json"], capture_output=True, text=True)
-    if result.returncode == 0:
-        configmaps_data = result.stdout
-        for item in configmaps_data['items']:
-            configmaps.append(item['metadata']['name'])
-    else:
-        print(f"Error listing ConfigMaps in namespace {namespace}.")
+# Function to process namespaces in a batch
+process_batch() {
+    local start_index=$1
+    local end_index=$2
+    for ((i = $start_index; i < $end_index; i++)); do
+        namespace=${namespaces[$i]}
+        process_namespace $namespace
+    done
+}
 
-    return configmaps
+# Function to process a single namespace
+process_namespace() {
+    local namespace=$1
+    echo "Processing namespace: $namespace"
+    # Get all ConfigMaps in the namespace
+    all_configmaps=$(oc get configmaps -n $namespace --no-headers | awk '{print $1}')
+    # Find delta ConfigMaps
+    for configmap in $all_configmaps; do
+        found=false
+        for required_configmap in "${required_configmaps[@]}"; do
+            if [ "$configmap" == "$required_configmap" ]; then
+                found=true
+                break
+            fi
+        done
+        if ! $found; then
+            echo "Delta ConfigMap: $configmap"
+            if $delete; then
+                delete_configmap $namespace $configmap
+            fi
+        fi
+    done
+    if [ -z "$all_configmaps" ]; then
+        echo "No ConfigMaps found in namespace."
+    fi
+}
 
-# Implement other functions for finding residual configmaps and performing actions
+# Function to delete ConfigMap and log to audit file
+delete_configmap() {
+    local namespace=$1
+    local configmap=$2
+    echo "Deleting ConfigMap $configmap in namespace $namespace"
+    if ! $dry_run; then
+        oc delete configmap $configmap -n $namespace >> "$audit_dir/$namespace.log"
+    fi
+}
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Find and delete residual ConfigMaps not used in Tekton Pipelines/Tasks in a specific cluster")
-    parser.add_argument("input_file", help="Path to the file containing Tekton Pipeline ConfigMaps")
-    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run to list the residual ConfigMaps")
-    parser.add_argument("--delete", action="store_true", help="Delete the residual ConfigMaps")
-    parser.add_argument("--output-file", help="Path to the output file to record deleted ConfigMaps")
-    args = parser.parse_args()
+# Define required ConfigMaps
+required_configmaps=(
+    "configmap1"
+    "configmap2"
+    # Add more required ConfigMaps here
+)
 
-    with open(args.input_file, "r") as file:
-        configmaps_used = [line.strip() for line in file]
+# Initialize namespaces array
+namespaces=($(oc get namespaces --no-headers | awk '{print $1}'))
 
-    all_namespaces = get_all_namespaces()
+# Calculate number of batches
+num_namespaces=${#namespaces[@]}
+num_batches=$((($num_namespaces + $batch_size - 1) / $batch_size))
 
-    for namespace in all_namespaces:
-        configmaps_in_namespace = get_configmaps_in_namespace(namespace)
-        # Add logic to find residual configmaps and perform actions based on the provided arguments
+# Iterate over batches
+for ((i = 0; i < $num_batches; i++)); do
+    start_index=$(($i * $batch_size))
+    end_index=$((($i + 1) * $batch_size))
+    if [ $end_index -gt $num_namespaces ]; then
+        end_index=$num_namespaces
+    fi
+    process_batch $start_index $end_index &
+done
+
+# Wait for all background processes to finish
+wait
+
+echo "Processing complete."
