@@ -11,58 +11,70 @@ def extract_script_contents(task_data):
             script_contents.append((step.get('name'), script))
     return script_contents
 
-def process_tekton_folder(folder_path, output_file):
+def process_tekton_folder(folder_paths, output_file):
     original_total_size = 0
     updated_total_size = 0
-    file_sizes = []
+    folder_sizes = {}
 
     with open(output_file, 'w') as f:
-        f.write("File Name,Original Size (bytes),Updated Size (bytes)\n")
+        f.write("Folder Name,File Name,Original Size (bytes),Updated Size (bytes)\n")
 
-        for filename in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, filename)
-            if os.path.isfile(file_path):
-                print(f"Processing file: {filename}")
-                with open(file_path, 'r') as file:
-                    task_data = yaml.safe_load(file.read())
-                    original_file_size = os.path.getsize(file_path)
-                    original_total_size += original_file_size
+        for folder_path in folder_paths:
+            folder_original_total = 0
+            folder_updated_total = 0
+            file_sizes = []
 
-                script_contents = extract_script_contents(task_data)
+            for filename in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, filename)
+                if os.path.isfile(file_path):
+                    print(f"Processing file: {file_path}")
+                    with open(file_path, 'r') as file:
+                        task_data = yaml.safe_load(file.read())
+                        original_file_size = os.path.getsize(file_path)
+                        original_total_size += original_file_size
+                        folder_original_total += original_file_size
 
-                if script_contents:
-                    updated_task_data = task_data.copy()
-                    spec = updated_task_data.get('spec', {})
-                    steps = spec.get('steps', [])
-                    for step in steps:
+                    script_contents = extract_script_contents(task_data)
+
+                    if script_contents:
+                        updated_task_data = task_data.copy()
+                        spec = updated_task_data.get('spec', {})
+                        steps = spec.get('steps', [])
+                        for step in steps:
+                            for step_name, script in script_contents:
+                                if step.get('script') == script:
+                                    script_filename = f"{filename}_{step_name}.sh"
+                                    step['command'] = ["./{}".format(script_filename)]
+                                    del step['script']
+
+                        updated_content = yaml.dump(updated_task_data)
+
                         for step_name, script in script_contents:
-                            if step.get('script') == script:
-                                script_filename = f"{filename}_{step_name}.sh"
-                                step['command'] = ["./{}".format(script_filename)]
-                                del step['script']
+                            script_filename = f"{filename}_{step_name}.sh"
+                            script_file_path = os.path.join(folder_path, script_filename)
+                            with open(script_file_path, 'w') as script_file:
+                                script_file.write(script)
 
-                    updated_content = yaml.dump(updated_task_data)
+                        updated_file_path = os.path.join(folder_path, f"updated_{filename}")
+                        with open(updated_file_path, 'w') as updated_file:
+                            updated_file.write(updated_content)
+                        updated_file_size = os.path.getsize(updated_file_path)
+                        updated_total_size += updated_file_size
+                        folder_updated_total += updated_file_size
 
-                    for step_name, script in script_contents:
-                        script_filename = f"{filename}_{step_name}.sh"
-                        script_file_path = os.path.join(folder_path, script_filename)
-                        with open(script_file_path, 'w') as script_file:
-                            script_file.write(script)
+                        file_sizes.append((filename, original_file_size, updated_file_size))
+                        f.write(f"{os.path.basename(folder_path)},{filename},{original_file_size},{updated_file_size}\n")
 
-                    updated_file_path = os.path.join(folder_path, f"updated_{filename}")
-                    with open(updated_file_path, 'w') as updated_file:
-                        updated_file.write(updated_content)
-                    updated_file_size = os.path.getsize(updated_file_path)
-                    updated_total_size += updated_file_size
-
-                    file_sizes.append((filename, original_file_size, updated_file_size))
-                    f.write(f"{filename},{original_file_size},{updated_file_size}\n")
+            folder_sizes[os.path.basename(folder_path)] = (folder_original_total, folder_updated_total)
 
         f.write(f"Total,{original_total_size},{updated_total_size}\n")
+
+        for folder_name, (folder_original_total, folder_updated_total) in folder_sizes.items():
+            f.write(f"{folder_name} Total,,{folder_original_total},{folder_updated_total}\n")
 
     print("\nCSV output written to:", output_file)
 
 # Example usage
-tekton_folder = "/path/to/tekton/folder"
+tekton_folders = ["/path/to/tekton/folder1", "/path/to/tekton/folder2", "/path/to/tekton/folder3"]
 output_file = "file_sizes.csv"
-process_tekton_folder(tekton_folder, output_file)
+process_tekton_folder(tekton_folders, output_file)
