@@ -13,11 +13,10 @@ TMP_DIR=$(mktemp -d)
 # Loop through each YAML file
 for file in "$TASK_DIR"/*.yaml; do
     # Extract inline scripts
-    awk '/^script: \|$/,/:$/{print "  script: '"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"++c".sh"'";next} {print}' "$file" > "$TMP_DIR/$(basename "$file")_updated.yaml"
-    awk '/^script: \|$/,/:$/{print > "'"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"c".sh"'";next} 1' "$file"
+    awk '/^script: \|$/,/:$/{print > "'"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"c".sh"'";next} 1 {c++}' "$file"
+    
     # Replace inline scripts with references to external script files
     # Update the YAML file with the correct paths to external script files
-    # Save the updated YAML file to the temporary directory
     awk '/^script: \|$/,/:$/{print "  script: '"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"++c".sh"'";next} {print}' "$file" > "$TMP_DIR/$(basename "$file")_updated.yaml"
 done
 
