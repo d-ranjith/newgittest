@@ -1,34 +1,49 @@
-#!/bin/bash
+import os
+import re
+import shutil
 
-# Directory containing Tekton task YAML files
-TASK_DIR="/path/to/tekton/tasks"
+def extract_script_contents(content):
+    script_contents = []
+    pattern = r'script\w*:\s*\|?([\s\S]*?)\n\s*(?=\w+:)'
+    matches = re.findall(pattern, content)
+    for match in matches:
+        script_contents.append(match.strip())
+    return script_contents
 
-# Create a directory to store extracted scripts
-SCRIPT_DIR="/path/to/extracted/scripts"
-mkdir -p "$SCRIPT_DIR"
+def process_tekton_folder(folder_path):
+    original_total_size = 0
+    updated_total_size = 0
+    script_counter = 1
 
-# Create a temporary directory to store updated YAML files
-TMP_DIR=$(mktemp -d)
+    for filename in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, filename)
+        if os.path.isfile(file_path):
+            with open(file_path, 'r') as file:
+                content = file.read()
+                original_total_size += os.path.getsize(file_path)
 
-# Loop through each YAML file
-for file in "$TASK_DIR"/*.yaml; do
-    # Extract inline scripts
-    awk '/^script: \|$/,/:$/{print > "'"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"c".sh"'";next} 1 {c++}' "$file"
-    
-    # Replace inline scripts with references to external script files
-    # Update the YAML file with the correct paths to external script files
-    awk '/^script: \|$/,/:$/{print "  script: '"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"++c".sh"'";next} {print}' "$file" > "$TMP_DIR/$(basename "$file")_updated.yaml"
-done
+            script_contents = extract_script_contents(content)
 
-# Calculate file size difference in MB
-original_size=$(du -shb "$TASK_DIR" | awk '{sum += $1} END {print sum/1024/1024}')
-updated_size=$(du -shb "$TMP_DIR" | awk '{sum += $1} END {print sum/1024/1024}')
-size_difference=$(echo "$updated_size - $original_size" | bc)
+            if script_contents:
+                updated_content = content
+                for i, script in enumerate(script_contents, start=1):
+                    script_filename = f"{filename}_{i}.sh"
+                    script_file_path = os.path.join(folder_path, script_filename)
+                    with open(script_file_path, 'w') as script_file:
+                        script_file.write(script)
 
-echo "Total size difference for all files: $size_difference MB"
+                    updated_content = re.sub(r'script\w*:\s*\|?[\s\S]*?\n\s*(?=\w+:)', f"script: {script_filename}\n", updated_content, count=1)
 
-# Replace original YAML files with the updated ones
-mv "$TMP_DIR"/*.yaml "$TASK_DIR"
+                updated_file_path = os.path.join(folder_path, f"updated_{filename}")
+                with open(updated_file_path, 'w') as updated_file:
+                    updated_file.write(updated_content)
+                updated_total_size += os.path.getsize(updated_file_path)
 
-# Cleanup temporary directory
-rm -rf "$TMP_DIR"
+                script_counter += len(script_contents)
+
+    print(f"Original total size: {original_total_size / (1024 * 1024):.2f} MB")
+    print(f"Updated total size: {updated_total_size / (1024 * 1024):.2f} MB")
+
+# Example usage
+tekton_folder = "/path/to/tekton/folder"
+process_tekton_folder(tekton_folder)
