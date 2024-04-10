@@ -32,7 +32,7 @@ def process_tekton_folder(folder_path):
                     with open(script_file_path, 'w') as script_file:
                         script_file.write(script)
 
-                    updated_content = updated_content.replace(f"script: |\n{script}", f"command: ['./{ script_filename}']")
+                    updated_content = updated_content.replace(script, f"script: {script_filename}")
 
                 updated_file_path = os.path.join(folder_path, f"updated_{filename}")
                 with open(updated_file_path, 'w') as updated_file:
