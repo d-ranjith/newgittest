@@ -1,117 +1,35 @@
 #!/bin/bash
 
-dry_run=false
-delete=false
-audit_dir="audit_logs"
-log_file="processing.log"  # Specify the name of the log file
-batch_size=50  # Adjust batch size as needed
+# Directory containing Tekton task YAML files
+TASK_DIR="/path/to/tekton/tasks"
 
-start_time=$(date +"%Y-%m-%d %H:%M:%S")
+# Create a directory to store extracted scripts
+SCRIPT_DIR="/path/to/extracted/scripts"
+mkdir -p "$SCRIPT_DIR"
 
-usage() {
-    echo "Usage: $0 [-d] [-D]"
-    echo "Options:"
-    echo "  -d  Dry run: List deltas without deleting"
-    echo "  -D  Delete deltas and log to audit file"
-    exit 1
-}
+# Create a temporary directory to store updated YAML files
+TMP_DIR=$(mktemp -d)
 
-# Redirect stdout and stderr to a log file
-exec > >(tee -a $log_file)
-exec 2>&1
-
-while getopts "dD" option; do
-    case "$option" in
-        d) dry_run=true ;;
-        D) delete=true ;;
-        *) usage ;;
-    esac
+# Loop through each YAML file
+for file in "$TASK_DIR"/*.yaml; do
+    # Extract inline scripts
+    awk '/^script: \|$/,/:$/{print "  script: '"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"++c".sh"'";next} {print}' "$file" > "$TMP_DIR/$(basename "$file")_updated.yaml"
+    awk '/^script: \|$/,/:$/{print > "'"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"c".sh"'";next} 1' "$file"
+    # Replace inline scripts with references to external script files
+    # Update the YAML file with the correct paths to external script files
+    # Save the updated YAML file to the temporary directory
+    awk '/^script: \|$/,/:$/{print "  script: '"$SCRIPT_DIR/$(basename "$file" .yaml)_script_"++c".sh"'";next} {print}' "$file" > "$TMP_DIR/$(basename "$file")_updated.yaml"
 done
 
-# Ensure audit directory exists
-mkdir -p $audit_dir
+# Calculate file size difference in MB
+original_size=$(du -shb "$TASK_DIR" | awk '{sum += $1} END {print sum/1024/1024}')
+updated_size=$(du -shb "$TMP_DIR" | awk '{sum += $1} END {print sum/1024/1024}')
+size_difference=$(echo "$updated_size - $original_size" | bc)
 
-# Function to process namespaces in a batch
-process_batch() {
-    local start_index=$1
-    local end_index=$2
-    for ((i = $start_index; i < $end_index; i++)); do
-        namespace=${namespaces[$i]}
-        process_namespace $namespace
-    done
-}
+echo "Total size difference for all files: $size_difference MB"
 
-# Function to process a single namespace
-process_namespace() {
-    local namespace=$1
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - Processing namespace: $namespace"
-    # Get all ConfigMaps in the namespace
-    all_configmaps=$(oc get configmaps -n $namespace --no-headers | awk '{print $1}')
-    # Find delta ConfigMaps
-    for configmap in $all_configmaps; do
-        found=false
-        for required_configmap in "${required_configmaps[@]}"; do
-            if [ "$configmap" == "$required_configmap" ]; then
-                found=true
-                break
-            fi
-        done
-        if ! $found; then
-            echo "$(date +"%Y-%m-%d %H:%M:%S") - Delta ConfigMap: $configmap"
-            if $delete; then
-                delete_configmap $namespace $configmap
-            fi
-        fi
-    done
-    if [ -z "$all_configmaps" ]; then
-        echo "$(date +"%Y-%m-%d %H:%M:%S") - No ConfigMaps found in namespace."
-    fi
-}
+# Replace original YAML files with the updated ones
+mv "$TMP_DIR"/*.yaml "$TASK_DIR"
 
-# Function to delete ConfigMap and log to audit file
-delete_configmap() {
-    local namespace=$1
-    local configmap=$2
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - Deleting ConfigMap $configmap in namespace $namespace"
-    if ! $dry_run; then
-        oc delete configmap $configmap -n $namespace >> "$audit_dir/$namespace.log"
-    fi
-}
-
-# Define required ConfigMaps
-required_configmaps=(
-    "configmap1"
-    "configmap2"
-    # Add more required ConfigMaps here
-)
-
-# Initialize namespaces array
-namespaces=($(oc get namespaces --no-headers | awk '{print $1}'))
-
-# Calculate number of batches
-num_namespaces=${#namespaces[@]}
-num_batches=$((($num_namespaces + $batch_size - 1) / $batch_size))
-
-# Iterate over batches
-for ((i = 0; i < $num_batches; i++)); do
-    start_index=$(($i * $batch_size))
-    end_index=$((($i + 1) * $batch_size))
-    if [ $end_index -gt $num_namespaces ]; then
-        end_index=$num_namespaces
-    fi
-    process_batch $start_index $end_index &
-done
-
-# Wait for all background processes to finish
-wait
-
-end_time=$(date +"%Y-%m-%d %H:%M:%S")
-echo "Processing complete."
-echo "Start time: $start_time"
-echo "End time: $end_time"
-
-# Compute overall processing time
-start_seconds=$(date -d "$start_time" +%s)
-end_seconds=$(date -d "$end_time" +%s)
-processing_time=$((end_seconds - start_seconds))
-echo "Overall processing time: $processing_time seconds"
+# Cleanup temporary directory
+rm -rf "$TMP_DIR"
