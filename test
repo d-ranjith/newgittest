@@ -14,13 +14,17 @@ def extract_script_contents(task_data):
 def process_tekton_folder(folder_path):
     original_total_size = 0
     updated_total_size = 0
+    file_sizes = []
+
+    print("File Name,Original Size (bytes),Updated Size (bytes)")
 
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
         if os.path.isfile(file_path):
             with open(file_path, 'r') as file:
                 task_data = yaml.safe_load(file.read())
-                original_total_size += os.path.getsize(file_path)
+                original_file_size = os.path.getsize(file_path)
+                original_total_size += original_file_size
 
             script_contents = extract_script_contents(task_data)
 
@@ -46,10 +50,16 @@ def process_tekton_folder(folder_path):
                 updated_file_path = os.path.join(folder_path, f"updated_{filename}")
                 with open(updated_file_path, 'w') as updated_file:
                     updated_file.write(updated_content)
-                updated_total_size += os.path.getsize(updated_file_path)
+                updated_file_size = os.path.getsize(updated_file_path)
+                updated_total_size += updated_file_size
 
-    print(f"Original total size: {original_total_size / (1024 * 1024):.2f} MB")
-    print(f"Updated total size: {updated_total_size / (1024 * 1024):.2f} MB")
+                file_sizes.append((filename, original_file_size, updated_file_size))
+                print(f"{filename},{original_file_size},{updated_file_size}")
+
+    print("Total,{},{}\n".format(original_total_size, updated_total_size))
+
+    for filename, original_size, updated_size in file_sizes:
+        print(f"{filename},{original_size},{updated_size}")
 
 # Example usage
 tekton_folder = "/path/to/tekton/folder"
