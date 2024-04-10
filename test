@@ -3,16 +3,17 @@ import yaml
 
 def extract_script_contents(task_data):
     script_contents = []
-    for step in task_data.get('steps', []):
+    spec = task_data.get('spec', {})
+    steps = spec.get('steps', [])
+    for step in steps:
         script = step.get('script')
         if script:
-            script_contents.append(script)
+            script_contents.append((step.get('name'), script))
     return script_contents
 
 def process_tekton_folder(folder_path):
     original_total_size = 0
     updated_total_size = 0
-    script_counter = 1
 
     for filename in os.listdir(folder_path):
         file_path = os.path.join(folder_path, filename)
@@ -25,8 +26,8 @@ def process_tekton_folder(folder_path):
 
             if script_contents:
                 updated_content = yaml.dump(task_data)
-                for i, script in enumerate(script_contents, start=1):
-                    script_filename = f"{filename}_{i}.sh"
+                for step_name, script in script_contents:
+                    script_filename = f"{filename}_{step_name}.sh"
                     script_file_path = os.path.join(folder_path, script_filename)
                     with open(script_file_path, 'w') as script_file:
                         script_file.write(script)
@@ -37,8 +38,6 @@ def process_tekton_folder(folder_path):
                 with open(updated_file_path, 'w') as updated_file:
                     updated_file.write(updated_content)
                 updated_total_size += os.path.getsize(updated_file_path)
-
-                script_counter += len(script_contents)
 
     print(f"Original total size: {original_total_size / (1024 * 1024):.2f} MB")
     print(f"Updated total size: {updated_total_size / (1024 * 1024):.2f} MB")
