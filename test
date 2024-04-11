@@ -1,5 +1,40 @@
 #!/bin/bash
 
+# Script: process_namespaces.sh
+#
+# Description:
+# This script processes namespaces in an OpenShift cluster to identify and manage configmaps. 
+# It can list deltas between the existing configmaps and a specified list of required configmaps,
+# and optionally delete the deltas and log the actions to an audit file.
+#
+# Usage:
+# ./process_namespaces.sh [options]
+#
+# Options:
+#   --cluster <cluster1,cluster2,...>  Specify clusters to process (optional)
+#   --ns-list <namespace1,namespace2,...>  Specify namespaces to process (optional)
+#   --ns-regex <regex>  Specify a regex pattern to filter namespaces (optional)
+#   --skip-ns <regex>  Specify a regex pattern to skip namespaces (optional)
+#   --ns-search-list <namespace1,namespace2,...>  Specify namespaces to search for stale configmaps (optional)
+#   -d  Dry run: List deltas without deleting (optional)
+#   -D  Delete deltas and log to audit file (optional)
+#   -h  Display this help message (optional)
+#
+# Example usage:
+# ./process_namespaces.sh --cluster cluster1 --ns-list namespace1,namespace2 --ns-search-list namespace3 -d
+#
+# Author: [Your Name]
+# Date: [Date]
+# Version: 1.0
+#
+# Notes:
+# - This script requires the 'oc' command-line tool to be installed and configured.
+# - Ensure that the necessary permissions are granted to the service account running this script.
+#
+# Disclaimer:
+# This script is provided as-is, without any warranties or guarantees. Use it at your own risk.
+
+
 dry_run=false
 delete=false
 audit_dir="/tmp"
