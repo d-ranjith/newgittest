@@ -157,3 +157,38 @@ start_seconds=$(date -d "$start_time" +%s)
 end_seconds=$(date -d "$end_time" +%s)
 processing_time=$((end_seconds - start_seconds))
 echo "[INFO] Overall processing time: $processing_time seconds" | tee -a $processing_log
+
+
+#!/bin/bash
+
+# Main script functionality...
+
+# Self-tests
+echo "Running self-tests..."
+
+# Test basic functionality
+./script.sh
+
+# Test dry run mode
+./script.sh -d
+
+# Test delete mode
+./script.sh -D
+
+# Test skipping namespaces
+./script.sh --skip-ns ".*-test-.*"
+
+# Test specific namespaces
+./script.sh --ns-list namespace1,namespace2
+
+# Test namespace regex
+./script.sh --ns-regex ".*-12345-.*"
+
+# Test configmap list inline
+./script.sh
+
+# Test multiple clusters
+./script.sh --cluster cluster1,cluster2
+
+echo "Self-tests complete."
+
