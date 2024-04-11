@@ -1,70 +1,159 @@
-def process_tekton_folder(folder_paths, output_file):
-    original_total_size = 0
-    updated_total_size = 0
-    folder_sizes = {}
+#!/bin/bash
 
-    with open(output_file, 'w') as f:
-        f.write("Folder Name,File Name,Original Size (bytes),Updated Size (bytes)\n")
+dry_run=false
+delete=false
+audit_dir="/tmp"
+audit_log="$audit_dir/audit.log"
+processing_log="$audit_dir/processing.log"
+batch_size=50  # Adjust batch size as needed
+clusters=()
+ns_list=()
+skip_ns_regex=""
+ns_search_list=()
 
-        for folder_path in folder_paths:
-            folder_original_total = 0
-            folder_updated_total = 0
-            file_sizes = []
+start_time=$(date +"%Y-%m-%d %H:%M:%S")
 
-            for filename in os.listdir(folder_path):
-                file_path = os.path.join(folder_path, filename)
-                if os.path.isfile(file_path):
-                    print(f"Processing file: {file_path}")
-                    with open(file_path, 'r') as file:
-                        task_data = yaml.safe_load(file.read())
-                        original_file_size = os.path.getsize(file_path)
-                        original_total_size += original_file_size
-                        folder_original_total += original_file_size
+usage() {
+    echo "Usage: $0 [-d] [-D] [--cluster cluster1,cluster2,...] [--ns-list namespace1,namespace2,...] [--ns-regex regex] [--skip-ns regex] [--ns-search-list namespace1,namespace2,...]"
+    echo "Options:"
+    echo "  -d  Dry run: List deltas without deleting"
+    echo "  -D  Delete deltas and log to audit file"
+    echo "  --cluster cluster1,cluster2,... : Specify clusters to target (comma-separated)"
+    echo "  --ns-list namespace1,namespace2,... : Specify namespaces to target (comma-separated)"
+    echo "  --ns-regex regex : Specify regex pattern to filter namespaces"
+    echo "  --skip-ns regex : Specify regex pattern to skip namespaces"
+    echo "  --ns-search-list namespace1,namespace2,... : Specify list of namespaces to search for stale configmaps"
+    exit 1
+}
 
-                    script_contents = extract_script_contents(task_data)
+# Redirect stdout and stderr to processing log file
+exec > >(tee -a $processing_log)
+exec 2>&1
 
-                    if script_contents:
-                        updated_task_data = task_data.copy()
-                        spec = updated_task_data.get('spec', {})
-                        steps = spec.get('steps', [])
-                        for step in steps:
-                            for step_name, script in script_contents:
-                                if step.get('script') == script:
-                                    base_filename, _ = os.path.splitext(filename)
-                                    script_filename = f"{base_filename}_{step_name}.sh"
-                                    step['command'] = ["./{}".format(script_filename)]
-                                    del step['script']
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        -d) dry_run=true ;;
+        -D) dry_run=true; delete=true ;;
+        --cluster) clusters=($(echo "$2" | tr ',' ' ')); shift ;;
+        --ns-list) ns_list=($(echo "$2" | tr ',' ' ')); shift ;;
+        --ns-regex) ns_regex="$2"; shift ;;
+        --skip-ns) skip_ns_regex="$2"; shift ;;
+        --ns-search-list) ns_search_list=($(echo "$2" | tr ',' ' ')); shift ;;
+        *) usage ;;
+    esac
+    shift
+done
 
-                        updated_content = yaml.dump(updated_task_data)
+# Ensure audit directory exists
+mkdir -p $audit_dir
 
-                        for step_name, script in script_contents:
-                            base_filename, _ = os.path.splitext(filename)
-                            script_filename = f"{base_filename}_{step_name}.sh"
-                            script_file_path = os.path.join(folder_path, script_filename)
-                            with open(script_file_path, 'w') as script_file:
-                                script_file.write(script)
+# Function to login to cluster
+login_to_cluster() {
+    local cluster=$1
+    echo "Logging in to cluster: $cluster"
+    oc login $cluster --insecure-skip-tls-verify
+}
 
-                        base_filename, _ = os.path.splitext(filename)
-                        updated_file_path = os.path.join(folder_path, f"updated_{base_filename}")
-                        with open(updated_file_path, 'w') as updated_file:
-                            updated_file.write(updated_content)
-                        updated_file_size = os.path.getsize(updated_file_path)
-                        updated_total_size += updated_file_size
-                        folder_updated_total += updated_file_size
+# Function to fetch namespaces
+fetch_namespaces() {
+    if [[ -n "$ns_regex" ]]; then
+        namespaces=($(oc get namespaces --no-headers -o custom-columns=NAME --show-labels | grep -E "$ns_regex"))
+    elif [[ ${#ns_list[@]} -gt 0 ]]; then
+        namespaces=("${ns_list[@]}")
+    else
+        namespaces=($(oc get namespaces --no-headers -o custom-columns=NAME --show-labels))
+    fi
+    # Apply skip namespace regex
+    if [[ -n "$skip_ns_regex" ]]; then
+        namespaces=($(echo "${namespaces[@]}" | tr ' ' '\n' | grep -vE "$skip_ns_regex"))
+    fi
+}
 
-                        file_sizes.append((base_filename, original_file_size, updated_file_size))
-                        f.write(f"{os.path.basename(folder_path)},{base_filename},{original_file_size},{updated_file_size}\n")
+# Function to process namespaces in a batch
+process_batch() {
+    local start_index=$1
+    local end_index=$2
+    for ((i = $start_index; i < $end_index; i++)); do
+        namespace=${namespaces[$i]}
+        process_namespace $namespace
+    done
+}
 
-            folder_sizes[os.path.basename(folder_path)] = (folder_original_total, folder_updated_total)
+# Function to process a single namespace
+process_namespace() {
+    local namespace=$1
+    echo "$(date +"%Y-%m-%d %H:%M:%S") - [INFO] Processing namespace: $namespace" | tee -a $processing_log
+    # Check if the namespace is in the search list
+    if [[ ${#ns_search_list[@]} -gt 0 && ! " ${ns_search_list[@]} " =~ " $namespace " ]]; then
+        echo "$(date +"%Y-%m-%d %H:%M:%S") - [INFO] Skipping namespace: $namespace" | tee -a $processing_log
+        return
+    fi
+    # Get all ConfigMaps in the namespace
+    all_configmaps=$(oc get configmaps -n $namespace --no-headers | awk '{print $1}')
+    # Find delta ConfigMaps
+    for configmap in $all_configmaps; do
+        found=false
+        for required_configmap in "${required_configmaps[@]}"; do
+            if [ "$configmap" == "$required_configmap" ]; then
+                found=true
+                break
+            fi
+        done
+        if ! $found; then
+            echo "$(date +"%Y-%m-%d %H:%M:%S") - [DELTA] Delta ConfigMap: $configmap" | tee -a $processing_log
+            if $delete; then
+                delete_configmap $namespace $configmap
+            fi
+        fi
+    done
+    if [ -z "$all_configmaps" ]; then
+        echo "$(date +"%Y-%m-%d %H:%M:%S") - [INFO] No ConfigMaps found in namespace: $namespace" | tee -a $processing_log
+    fi
+}
 
-        f.write(f"Total,{original_total_size},{updated_total_size}\n")
+# Function to delete ConfigMap and log to audit file
+delete_configmap() {
+    local namespace=$1
+    local configmap=$2
+    echo "$(date +"%Y-%m-%d %H:%M:%S") - [AUDIT] Deleting ConfigMap $configmap in namespace $namespace" | tee -a $audit_log
+    if ! $dry_run; then
+        oc delete configmap $configmap -n $namespace >> "$audit_dir/$namespace.log"
+    fi
+}
 
-        for folder_name, (folder_original_total, folder_updated_total) in folder_sizes.items():
-            f.write(f"{folder_name} Total,,{folder_original_total},{folder_updated_total}\n")
+# Define required ConfigMaps
+required_configmaps=(
+    $(<configmap_list.txt)
+)
 
-    print("\nCSV output written to:", output_file)
+# Login to each cluster
+for cluster in "${clusters[@]}"; do
+    login_to_cluster $cluster
+    fetch_namespaces
+    # Calculate number of namespaces
+    num_namespaces=${#namespaces[@]}
+    # Calculate number of batches
+    num_batches=$((($num_namespaces + $batch_size - 1) / $batch_size))
+    # Iterate over batches
+    for ((i = 0; i < $num_batches; i++)); do
+        start_index=$(($i * $batch_size))
+        end_index=$((($i + 1) * $batch_size))
+        if [ $end_index -gt $num_namespaces ]; then
+            end_index=$num_namespaces
+        fi
+        process_batch $start_index $end_index &
+    done
+    # Wait for all background processes to finish
+    wait
+done
 
-# Example usage
-tekton_folders = ["/path/to/tekton/folder1", "/path/to/tekton/folder2", "/path/to/tekton/folder3"]
-output_file = "file_sizes.csv"
-process_tekton_folder(tekton_folders, output_file)
+end_time=$(date +"%Y-%m-%d %H:%M:%S")
+echo "[INFO] Processing complete." | tee -a $processing_log
+echo "[INFO] Start time: $start_time" | tee -a $processing_log
+echo "[INFO] End time: $end_time" | tee -a $processing_log
+
+# Compute overall processing time
+start_seconds=$(date -d "$start_time" +%s)
+end_seconds=$(date -d "$end_time" +%s)
+processing_time=$((end_seconds - start_seconds))
+echo "[INFO] Overall processing time: $processing_time seconds" | tee -a $processing_log
