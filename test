@@ -1,229 +1,266 @@
-#!/bin/bash
+config.json
 
-# Script: process_namespaces.sh
-#
-# Description:
-# This script processes namespaces in an OpenShift cluster to identify and manage configmaps. 
-# It can list deltas between the existing configmaps and a specified list of required configmaps,
-# and optionally delete the deltas and log the actions to an audit file.
-#
-# Usage:
-# ./process_namespaces.sh [options]
-#
-# Options:
-#   --cluster <cluster1,cluster2,...>  Specify clusters to process (optional)
-#   --ns-list <namespace1,namespace2,...>  Specify namespaces to process (optional)
-#   --ns-regex <regex>  Specify a regex pattern to filter namespaces (optional)
-#   --skip-ns <regex>  Specify a regex pattern to skip namespaces (optional)
-#   --ns-search-list <namespace1,namespace2,...>  Specify namespaces to search for stale configmaps (optional)
-#   -d  Dry run: List deltas without deleting (optional)
-#   -D  Delete deltas and log to audit file (optional)
-#   -h  Display this help message (optional)
-#
-# Example usage:
-# ./process_namespaces.sh --cluster cluster1 --ns-list namespace1,namespace2 --ns-search-list namespace3 -d
-#
-# Author: [Your Name]
-# Date: [Date]
-# Version: 1.0
-#
-# Notes:
-# - This script requires the 'oc' command-line tool to be installed and configured.
-# - Ensure that the necessary permissions are granted to the service account running this script.
-#
-# Disclaimer:
-# This script is provided as-is, without any warranties or guarantees. Use it at your own risk.
-
-
-dry_run=false
-delete=false
-audit_dir="/tmp"
-audit_log="$audit_dir/audit.log"
-processing_log="$audit_dir/processing.log"
-batch_size=50  # Adjust batch size as needed
-clusters=()
-ns_list=()
-skip_ns_regex=""
-ns_search_list=()
-
-start_time=$(date +"%Y-%m-%d %H:%M:%S")
-
-usage() {
-    echo "Usage: $0 [-d] [-D] [--cluster cluster1,cluster2,...] [--ns-list namespace1,namespace2,...] [--ns-regex regex] [--skip-ns regex] [--ns-search-list namespace1,namespace2,...]"
-    echo "Options:"
-    echo "  -d  Dry run: List deltas without deleting"
-    echo "  -D  Delete deltas and log to audit file"
-    echo "  --cluster cluster1,cluster2,... : Specify clusters to target (comma-separated)"
-    echo "  --ns-list namespace1,namespace2,... : Specify namespaces to target (comma-separated)"
-    echo "  --ns-regex regex : Specify regex pattern to filter namespaces"
-    echo "  --skip-ns regex : Specify regex pattern to skip namespaces"
-    echo "  --ns-search-list namespace1,namespace2,... : Specify list of namespaces to search for stale configmaps"
-    exit 1
+{
+    "Cluster1": {
+        "context": "cluster1-context",
+        "url": "https://api.cluster1.example.com",
+        "token": "your-token-here",
+        "prometheus": "https://prometheus.cluster1.example.com"
+    },
+    "Cluster2": {
+        "context": "cluster2-context",
+        "url": "https://api.cluster2.example.com",
+        "token": "your-token-here",
+        "prometheus": "https://prometheus.cluster2.example.com"
+    },
+    "required_commands": ["oc", "tkn", "iperf", "ping", "traceroute", "git"]
 }
 
-# Redirect stdout and stderr to processing log file
-exec > >(tee -a $processing_log)
-exec 2>&1
 
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -d) dry_run=true ;;
-        -D) dry_run=true; delete=true ;;
-        --cluster) clusters=($(echo "$2" | tr ',' ' ')); shift ;;
-        --ns-list) ns_list=($(echo "$2" | tr ',' ' ')); shift ;;
-        --ns-regex) ns_regex="$2"; shift ;;
-        --skip-ns) skip_ns_regex="$2"; shift ;;
-        --ns-search-list) ns_search_list=($(echo "$2" | tr ',' ' ')); shift ;;
-        *) usage ;;
-    esac
-    shift
-done
+setup.py
 
-# Ensure audit directory exists
-mkdir -p $audit_dir
+from setuptools import setup, find_packages
 
-# Function to login to cluster
-login_to_cluster() {
-    local cluster=$1
-    echo "Logging in to cluster: $cluster"
-    oc login $cluster --insecure-skip-tls-verify
-}
-
-# Function to fetch namespaces
-fetch_namespaces() {
-    if [[ -n "$ns_regex" ]]; then
-        namespaces=($(oc get namespaces --no-headers -o custom-columns=NAME --show-labels | grep -E "$ns_regex"))
-    elif [[ ${#ns_list[@]} -gt 0 ]]; then
-        namespaces=("${ns_list[@]}")
-    else
-        namespaces=($(oc get namespaces --no-headers -o custom-columns=NAME --show-labels))
-    fi
-    # Apply skip namespace regex
-    if [[ -n "$skip_ns_regex" ]]; then
-        namespaces=($(echo "${namespaces[@]}" | tr ' ' '\n' | grep -vE "$skip_ns_regex"))
-    fi
-}
-
-# Function to process namespaces in a batch
-process_batch() {
-    local start_index=$1
-    local end_index=$2
-    for ((i = $start_index; i < $end_index; i++)); do
-        namespace=${namespaces[$i]}
-        process_namespace $namespace
-    done
-}
-
-# Function to process a single namespace
-process_namespace() {
-    local namespace=$1
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - [INFO] Processing namespace: $namespace" | tee -a $processing_log
-    # Check if the namespace is in the search list
-    if [[ ${#ns_search_list[@]} -gt 0 && ! " ${ns_search_list[@]} " =~ " $namespace " ]]; then
-        echo "$(date +"%Y-%m-%d %H:%M:%S") - [INFO] Skipping namespace: $namespace" | tee -a $processing_log
-        return
-    fi
-    # Get all ConfigMaps in the namespace
-    all_configmaps=$(oc get configmaps -n $namespace --no-headers | awk '{print $1}')
-    # Find delta ConfigMaps
-    for configmap in $all_configmaps; do
-        found=false
-        for required_configmap in "${required_configmaps[@]}"; do
-            if [ "$configmap" == "$required_configmap" ]; then
-                found=true
-                break
-            fi
-        done
-        if ! $found; then
-            echo "$(date +"%Y-%m-%d %H:%M:%S") - [DELTA] Delta ConfigMap: $configmap" | tee -a $processing_log
-            if $delete; then
-                delete_configmap $namespace $configmap
-            fi
-        fi
-    done
-    if [ -z "$all_configmaps" ]; then
-        echo "$(date +"%Y-%m-%d %H:%M:%S") - [INFO] No ConfigMaps found in namespace: $namespace" | tee -a $processing_log
-    fi
-}
-
-# Function to delete ConfigMap and log to audit file
-delete_configmap() {
-    local namespace=$1
-    local configmap=$2
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - [AUDIT] Deleting ConfigMap $configmap in namespace $namespace" | tee -a $audit_log
-    if ! $dry_run; then
-        oc delete configmap $configmap -n $namespace >> "$audit_dir/$namespace.log"
-    fi
-}
-
-# Define required ConfigMaps
-required_configmaps=(
-    $(<configmap_list.txt)
+setup(
+    name='openshift-diagnostic-tool',
+    version='0.1.0',
+    packages=find_packages(),
+    install_requires=[
+        'requests',  # if you are using requests in the script
+        'pandas'     # if pandas is needed for data manipulation
+    ],
+    entry_points={
+        'console_scripts': [
+            'openshift-diagnostic=diagnostic_script.main',  # assuming your script is named 'diagnostic_script.py' and the main function is 'main'
+        ],
+    },
 )
 
-# Login to each cluster
-for cluster in "${clusters[@]}"; do
-    login_to_cluster $cluster
-    fetch_namespaces
-    # Calculate number of namespaces
-    num_namespaces=${#namespaces[@]}
-    # Calculate number of batches
-    num_batches=$((($num_namespaces + $batch_size - 1) / $batch_size))
-    # Iterate over batches
-    for ((i = 0; i < $num_batches; i++)); do
-        start_index=$(($i * $batch_size))
-        end_index=$((($i + 1) * $batch_size))
-        if [ $end_index -gt $num_namespaces ]; then
-            end_index=$num_namespaces
-        fi
-        process_batch $start_index $end_index &
-    done
-    # Wait for all background processes to finish
-    wait
-done
+usage
 
-end_time=$(date +"%Y-%m-%d %H:%M:%S")
-echo "[INFO] Processing complete." | tee -a $processing_log
-echo "[INFO] Start time: $start_time" | tee -a $processing_log
-echo "[INFO] End time: $end_time" | tee -a $processing_log
+Usage and Execution
+With these changes, you can now:
 
-# Compute overall processing time
-start_seconds=$(date -d "$start_time" +%s)
-end_seconds=$(date -d "$end_time" +%s)
-processing_time=$((end_seconds - start_seconds))
-echo "[INFO] Overall processing time: $processing_time seconds" | tee -a $processing_log
+Package your tool using python setup.py develop or python setup.py install.
+Run your tool via the command line anywhere you have Python installed, using something like:
+bash
+Copy code
+openshift-diagnostic --config /path/to/your/config.json
 
 
-#!/bin/bash
+openshift-diagnostic-tool.py
 
-# Main script functionality...
 
-# Self-tests
-echo "Running self-tests..."
+import argparse
+import json
+import os
+import subprocess
+from pathlib import Path
+from shutil import which
 
-# Test basic functionality
-./script.sh
+"""
+This  script aims to provide comprehensive insights into the health, configuration, and performance of OpenShift clusters. It ensures that you not only monitor basic metrics but also delve deeper into workload specifics, security configurations, and service details which are vital for thorough diagnostics and performance evaluations.
+"""
+def check_prerequisites(commands):
+    """Check if all required command-line tools are available on the system."""
+    missing_commands = [cmd for cmd in commands if which(cmd) is None]
+    if missing_commands:
+        print("Missing required tools: " + ", ".join(missing_commands))
+        print("Please install the missing tools and try again.")
+        exit(1)
 
-# Test dry run mode
-./script.sh -d
+def run_command(command):
+    """Run a shell command and return its output, handle errors gracefully."""
+    result = subprocess.run(command, shell=True, text=True, capture_output=True)
+    if result.returncode != 0:
+        print(f"Error executing {' '.join(command)}: {result.stderr}")
+    return result.stdout
 
-# Test delete mode
-./script.sh -D
+def collect_cluster_info(cluster_context):
+    """Collect a variety of information about the cluster based on the specified context.
+        version: Retrieves the version of the OpenShift client and server.
+        clusterversion: Fetches detailed version information of the OpenShift cluster.
+        networkpolicy: Lists all network policies across namespaces.
+        quota: Displays resource quotas for all namespaces.
+        limitrange: Shows limit ranges applied across all namespaces.
+        nodes: Lists all nodes in the cluster.
+        describe_nodes: Provides detailed descriptions of each node.
+        top_nodes: Shows current CPU and memory usage for nodes.
+        top_pods: Reports CPU and memory usage of pods across all namespaces.
+        network_config: Retrieves network configuration details in YAML format.
+        pvc: Lists all Persistent Volume Claims across all namespaces.
+        pv: Lists all Persistent Volumes across all namespaces.
+        describe_storageclass: Provides detailed descriptions of each storage class.
+        pods_labels: Lists all pods across all namespaces and shows their labels.
+        events: Displays events sorted by creation timestamp to understand recent activities.
+        scc: Lists all Security Context Constraints.    
+    """
+    print(f"Collecting data for cluster with context: {cluster_context}")
+def collect_cluster_info(cluster_context, output_dir):
+    """Collect a variety of information about the cluster based on the specified context."""
+    print(f"Collecting data for cluster with context: {cluster_context}")
+    commands = {
+        "version": f"oc --context={cluster_context} version",
+        "clusterversion": f"oc --context={cluster_context} get clusterversion",
+        "networkpolicy": f"oc --context={cluster_context} get networkpolicy --all-namespaces",
+        "quota": f"oc --context={cluster_context} get quota --all-namespaces",
+        "limitrange": f"oc --context={cluster_context} get limitrange --all-namespaces",
+        "nodes": f"oc --context={cluster_context} get nodes",
+        "describe_nodes": f"oc --context={cluster_context} describe nodes",
+        "top_nodes": f"oc --context={cluster_context} adm top nodes",
+        "top_pods": f"oc --context={cluster_context} adm top pods --all-namespaces",
+        "network_config": f"oc --context={cluster_context} get network.config/cluster -o yaml",
+        "pvc": f"oc --context={cluster_context} get pvc --all-namespaces",
+        "pv": f"oc --context={cluster_context} get pv --all-namespaces",
+        "describe_storageclass": f"oc --context={cluster_context} describe storageclass",
+        "pods_labels": f"oc --context={cluster_context} get pods --show-labels --all-namespaces",
+        "events": f"oc --context={cluster_context} get events --sort-by='.metadata.creationTimestamp'",
+        "scc": f"oc --context={cluster_context} get scc",
+        "clusteroperators": f"oc --context={cluster_context} get clusteroperators",
+        "pods_details": f"oc --context={cluster_context} describe pods --all-namespaces",
+        "services": f"oc --context={cluster_context} get services --all-namespaces",
+        "ingresses": f"oc --context={cluster_context} get ingresses --all-namespaces",
+        "roles": f"oc --context={cluster_context} get roles --all-namespaces",
+        "rolebindings": f"oc --context={cluster_context} get rolebindings --all-namespaces"
+    }
 
-# Test skipping namespaces
-./script.sh --skip-ns ".*-test-.*"
+    for key, cmd in commands.items():
+        output = run_command(cmd)
+        output_path = os.path.join(output_dir, f"{cluster_context}_{key}.txt")
+        with open(output_path, 'w') as file:
+            file.write(output)
+        print(f"Output for {key} written to {output_path}")
 
-# Test specific namespaces
-./script.sh --ns-list namespace1,namespace2
+    for key, cmd in commands.items():
+        output = run_command(cmd)
+        output_path = os.path.join(output_dir, f"{cluster_context}_{key}.txt")
+        with open(output_path, 'w') as file:
+            file.write(output)
+        print(f"Output for {key} written to {output_path}")
 
-# Test namespace regex
-./script.sh --ns-regex ".*-12345-.*"
+def collect_resource_utilization(cluster_context, output_file):
+    """Collects resource utilization metrics using oc commands."""
+    print(f"Collecting resource utilization metrics for cluster: {cluster_context}")
+    nodes_output = run_command(f"oc --context={cluster_context} adm top nodes")
+    pods_output = run_command(f"oc --context={cluster_context} adm top pods")
+    with open(output_file, 'w') as file:
+        file.write(nodes_output + '\n' + pods_output)
 
-# Test configmap list inline
-./script.sh
+def collect_tekton_metrics(cluster_context, output_file):
+    """Collect Tekton pipeline metrics using the Tekton CLI."""
+    print(f"Collecting Tekton pipeline metrics for cluster: {cluster_context}")
+    pipeline_output = run_command(f"tkn --context={cluster_context} pipeline list")
+    taskrun_output = run_command(f"tkn --context={cluster_context} taskrun list")
+    with open(output_file, 'w') as file:
+        file.write(pipeline_output + '\n' + taskrun_output)
 
-# Test multiple clusters
-./script.sh --cluster cluster1,cluster2
+def collect_network_performance(cluster_context, output_file):
+    """Measure network performance using network testing tools like iperf, ping, and traceroute."""
+    print(f"Collecting network performance metrics for cluster: {cluster_context}")
+    iperf_output = run_command(f"iperf -c {os.getenv('IPERF_HOST', 'git-repo-host')} -t 60")
+    ping_output = run_command(f"ping {os.getenv('PING_HOST', 'git-repo-host')} -c 4")
+    traceroute_output = run_command(f"traceroute {os.getenv('TRACEROUTE_HOST', 'git-repo-host')}")
+    with open(output_file, 'w') as file:
+        file.write(iperf_output + '\n' + ping_output + '\n' + traceroute_output)
 
-echo "Self-tests complete."
+def collect_git_repo_info(git_repo_url, output_file):
+    """Collect Git repository information by cloning and analyzing the repository."""
+    print(f"Collecting Git repository information: {git_repo_url}")
+    clone_output = run_command(f"git clone --bare {git_repo_url} tmp-repo")
+    size_output = run_command("du -sh tmp-repo")
+    commit_count_output = run_command("git -C tmp-repo rev-list --count HEAD")
+    run_command("rm -rf tmp-repo")
+    with open(output_file, 'w') as file:
+        file.write(size_output + '\n' + commit_count_output)
 
+def collect_namespace_metrics(cluster_context, output_file):
+    """Collect namespace-level metrics using oc commands."""
+    print(f"Collecting namespace-level metrics for cluster: {cluster_context}")
+    namespaces_output = run_command(f"oc --context={cluster_context} get namespaces")
+    pods_output = run_command(f"oc --context={cluster_context} get pods --all-namespaces")
+    quotas_output = run_command(f"oc --context={cluster_context} get resourcequotas --all-namespaces")
+    with open(output_file, 'w') as file:
+        file.write(namespaces_output + '\n' + pods_output + '\n' + quotas_output)
+
+def main(config_path):
+    """Main function to orchestrate metric collection based on the provided configuration."""
+    # Load configuration file
+    with open(config_path, 'r') as config_file:
+        config = json.load(config_file)
+
+    # Load clusters and required commands
+    clusters = {key: value for key, value in config.items() if key.startswith("Cluster")}
+    required_commands = config.get("required_commands", [])
+
+    # Setup the output directory
+    output_dir = "cluster_metrics"
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Check prerequisites before proceeding
+    if required_commands:
+        check_prerequisites(required_commands)
+
+    # Process each cluster based on the configuration
+    for cluster_name, cluster_info in clusters.items():
+        context = cluster_info["context"]
+        print(f"Processing {cluster_name} with context {context}")
+    # Create a directory for each cluster's outputs, if it does not already exist
+    cluster_output_dir = os.path.join(output_dir, cluster_name)
+    os.makedirs(cluster_output_dir, exist_ok=True)
+
+    # Collect general information about the cluster
+    collect_cluster_info(context, cluster_output_dir)
+
+    # Collect resource utilization metrics and save them to a specific file within the cluster's directory
+    resource_utilization_file = os.path.join(cluster_output_dir, f"{cluster_name}_resource_utilization.txt")
+    collect_resource_utilization(context, resource_utilization_file)
+
+    # Assuming other functions such as collect_tekton_metrics, collect_network_performance, etc. are defined elsewhere
+    # Collect Tekton pipeline metrics
+    tekton_metrics_file = os.path.join(cluster_output_dir, f"{cluster_name}_tekton_metrics.txt")
+    collect_tekton_metrics(context, tekton_metrics_file)
+
+    # Collect network performance metrics
+    network_performance_file = os.path.join(cluster_output_dir, f"{cluster_name}_network_performance.txt")
+    collect_network_performance(context, network_performance_file)
+
+    # Collect git repository information
+    git_repo_info_file = os.path.join(cluster_output_dir, f"{cluster_name}_git_repo_info.txt")
+    collect_git_repo_info("https://example.com/git-repo.git", git_repo_info_file)  # Replace the URL with actual Git repository URL
+
+    # Collect namespace-level metrics
+    namespace_metrics_file = os.path.join(cluster_output_dir, f"{cluster_name}_namespace_metrics.txt")
+    collect_namespace_metrics(context, namespace_metrics_file)
+
+    print(f"All data collection for {cluster_name} completed and saved in {cluster_output_dir}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="OpenShift Diagnostic Tool")
+    parser.add_argument('--config', type=str, default='config.json', help='Path to configuration file')
+    args = parser.parse_args()
+    main(args.config)
+
+
+
+    Reason for script
+    
+While OpenShift dashboards and tools like Grafana provide real-time monitoring and visualizations of cluster metrics, the script-based approach to collecting and analyzing data from multiple clusters offers several distinct advantages, especially in environments where detailed, customized, or historical analysis is required. Here are some ways in which script-based data collection and analysis can complement or enhance the insights provided by Grafana and OpenShift dashboards:
+
+1. Customized Data Collection
+Specific Metrics: Scripts can be tailored to collect very specific data that may not be available through standard monitoring tools, or data that needs to be collected in a particular format.
+Deep Dives: Scripts allow for deep dives into specific areas of interest, such as security configurations (SCC, roles, and bindings), detailed pod or node descriptions, or Tekton pipeline metrics, which might not be readily accessible or detailed in generic dashboards.
+2. Cross-Cluster Comparisons
+Standardization: Scripts can ensure data is collected in exactly the same way across different clusters, which simplifies direct comparisons.
+Automation: Scripting can automate the process of comparing configurations and performance metrics across clusters, which is particularly useful in environments with multiple clusters.
+3. Historical Data Analysis
+Data Retention: Scripts can store data snapshots over time, allowing for historical analysis that might not be possible with real-time tools where data is only retained for a limited period.
+Trend Analysis: With historical data, scripts can help identify trends or patterns in resource usage or performance, which are crucial for capacity planning and forecasting.
+4. Complex Analysis Workflows
+Integration with Analysis Tools: Scripted data can be easily integrated into more complex data analysis workflows involving tools like Python (Pandas, NumPy), R, or specialized statistical software.
+Custom Reports: Scripts can generate customized reports that include specific analyses, summaries, and visualizations tailored to the needs of different stakeholders.
+5. Operational and Configuration Audits
+Configuration Drift: Scripts can be used to perform detailed configuration audits to check for drifts or discrepancies against baseline configurations across clusters.
+Compliance Checks: Regularly scheduled scripts can help ensure compliance with internal standards or external regulations by systematically checking configurations and settings.
+6. Enhanced Debugging and Troubleshooting
+Detailed Logs and Metrics: In the event of issues, scripts can collect detailed logs and metrics that are crucial for troubleshooting but may not be retained or visualized on dashboards.
+Reproducibility: Having a script that can be run at any time provides a repeatable method to collect diagnostic data which can be crucial during incident response.
