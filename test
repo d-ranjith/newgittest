@@ -1,65 +1,25 @@
-import os
-
-def generate_directory_tree_html(path, base_path="/"):
-    """
-    Recursively generates HTML for directory structure.
-    """
-    html = "<ul>"
-    for item in sorted(os.listdir(path)):
-        item_path = os.path.join(path, item)
-        web_path = os.path.join(base_path, item)
-        if os.path.isdir(item_path):
-            html += f'<li><span class="folder">{item}</span>'
-            html += generate_directory_tree_html(item_path, web_path + "/")
-            html += '</li>'
-        else:
-            html += f'<li><a href="#" onclick="loadFile(\'{web_path}\')">{item}</a></li>'
-    html += "</ul>"
-    return html
-
-def create_index_html(output_dir):
-    """
-    Create an index.html file in the output directory.
-    """
-    base_directory_name = os.path.basename(output_dir)
-    html_content = f"""
-    <html>
-    <head>
-        <title>Cluster Output Files - {base_directory_name}</title>
-        <style>
-            body {{ font-family: Arial, sans-serif; display: flex; height: 100vh; overflow: hidden; }}
-            #directoryTree {{ width: 300px; overflow-y: auto; border-right: 1px solid #ccc; padding: 10px; }}
-            #contentPane {{ flex-grow: 1; overflow-y: auto; padding: 10px; }}
-            .folder {{ font-weight: bold; }}
-            ul {{ list-style-type: none; padding-left: 0; }}
-            li {{ margin: 5px 0; }}
-            a {{ text-decoration: none; color: blue; }}
-            a:hover {{ text-decoration: underline; }}
-        </style>
-        <script>
-            function loadFile(url) {{
-                fetch(url)
-                    .then(response => response.text())
-                    .then(text => document.getElementById('contentPane').innerText = text)
-                    .catch(err => console.error(err));
-            }}
-        </script>
-    </head>
-    <body>
-        <div id="directoryTree">
-            <h2>Directory: {base_directory_name}</h2>
-            {generate_directory_tree_html(output_dir)}
-        </div>
-        <div id="contentPane">
-            <h3>Content Viewer</h3>
-            Click on a file to view its contents here.
-        </div>
-    </body>
-    </html>
-    """
-    with open(os.path.join(output_dir, "index.html"), "w") as f:
-        f.write(html_content)
-
-# Example usage, ensure to specify the correct output directory path
-output_dir = "/path/to/your/cluster_metrics_directory"
-create_index_html(output_dir)
+#
+# Script Name: launch_diagnostics_and_serve.sh
+#
+# Description:
+#   This Bash script automates the process of running a Python script that generates
+#   diagnostics data for OpenShift/Tekton/Kubernetes clusters and then starts a
+#   built-in Python HTTP server to serve the results through an interactive HTML interface.
+#   The script ensures that any user on the same network can access the diagnostics information
+#   via a web browser.
+#
+# Usage:
+#   1. Ensure that Python 3.x is installed and accessible.
+#   2. Place this script in the same directory as your Python script.
+#   3. Make sure this script has executable permissions:
+#      $ chmod +x launch_diagnostics_and_serve.sh
+#   4. Execute the script:
+#      $ ./launch_diagnostics_and_serve.sh
+#   5. Once the server starts, access the diagnostics view from any machine in the network by:
+#      http://<server-ip>:8000/
+#      Replace '<server-ip>' with the actual IP address of the machine where the server is running.
+#
+# Security Note:
+#   - The HTTP server launched by this script is for temporary use in controlled environments.
+#     It is not secure for production environments as it lacks HTTPS and authentication mechanisms.
+#
