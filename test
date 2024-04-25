@@ -1,266 +1,64 @@
-config.json
-
-{
-    "Cluster1": {
-        "context": "cluster1-context",
-        "url": "https://api.cluster1.example.com",
-        "token": "your-token-here",
-        "prometheus": "https://prometheus.cluster1.example.com"
-    },
-    "Cluster2": {
-        "context": "cluster2-context",
-        "url": "https://api.cluster2.example.com",
-        "token": "your-token-here",
-        "prometheus": "https://prometheus.cluster2.example.com"
-    },
-    "required_commands": ["oc", "tkn", "iperf", "ping", "traceroute", "git"]
-}
-
-
-setup.py
-
-from setuptools import setup, find_packages
-
-setup(
-    name='openshift-diagnostic-tool',
-    version='0.1.0',
-    packages=find_packages(),
-    install_requires=[
-        'requests',  # if you are using requests in the script
-        'pandas'     # if pandas is needed for data manipulation
-    ],
-    entry_points={
-        'console_scripts': [
-            'openshift-diagnostic=diagnostic_script.main',  # assuming your script is named 'diagnostic_script.py' and the main function is 'main'
-        ],
-    },
-)
-
-usage
-
-Usage and Execution
-With these changes, you can now:
-
-Package your tool using python setup.py develop or python setup.py install.
-Run your tool via the command line anywhere you have Python installed, using something like:
-bash
-Copy code
-openshift-diagnostic --config /path/to/your/config.json
-
-
-openshift-diagnostic-tool.py
-
-
-import argparse
-import json
 import os
-import subprocess
-from pathlib import Path
-from shutil import which
 
-"""
-This  script aims to provide comprehensive insights into the health, configuration, and performance of OpenShift clusters. It ensures that you not only monitor basic metrics but also delve deeper into workload specifics, security configurations, and service details which are vital for thorough diagnostics and performance evaluations.
-"""
-def check_prerequisites(commands):
-    """Check if all required command-line tools are available on the system."""
-    missing_commands = [cmd for cmd in commands if which(cmd) is None]
-    if missing_commands:
-        print("Missing required tools: " + ", ".join(missing_commands))
-        print("Please install the missing tools and try again.")
-        exit(1)
-
-def run_command(command):
-    """Run a shell command and return its output, handle errors gracefully."""
-    result = subprocess.run(command, shell=True, text=True, capture_output=True)
-    if result.returncode != 0:
-        print(f"Error executing {' '.join(command)}: {result.stderr}")
-    return result.stdout
-
-def collect_cluster_info(cluster_context):
-    """Collect a variety of information about the cluster based on the specified context.
-        version: Retrieves the version of the OpenShift client and server.
-        clusterversion: Fetches detailed version information of the OpenShift cluster.
-        networkpolicy: Lists all network policies across namespaces.
-        quota: Displays resource quotas for all namespaces.
-        limitrange: Shows limit ranges applied across all namespaces.
-        nodes: Lists all nodes in the cluster.
-        describe_nodes: Provides detailed descriptions of each node.
-        top_nodes: Shows current CPU and memory usage for nodes.
-        top_pods: Reports CPU and memory usage of pods across all namespaces.
-        network_config: Retrieves network configuration details in YAML format.
-        pvc: Lists all Persistent Volume Claims across all namespaces.
-        pv: Lists all Persistent Volumes across all namespaces.
-        describe_storageclass: Provides detailed descriptions of each storage class.
-        pods_labels: Lists all pods across all namespaces and shows their labels.
-        events: Displays events sorted by creation timestamp to understand recent activities.
-        scc: Lists all Security Context Constraints.    
+def generate_directory_tree_html(path, base_path="/"):
     """
-    print(f"Collecting data for cluster with context: {cluster_context}")
-def collect_cluster_info(cluster_context, output_dir):
-    """Collect a variety of information about the cluster based on the specified context."""
-    print(f"Collecting data for cluster with context: {cluster_context}")
-    commands = {
-        "version": f"oc --context={cluster_context} version",
-        "clusterversion": f"oc --context={cluster_context} get clusterversion",
-        "networkpolicy": f"oc --context={cluster_context} get networkpolicy --all-namespaces",
-        "quota": f"oc --context={cluster_context} get quota --all-namespaces",
-        "limitrange": f"oc --context={cluster_context} get limitrange --all-namespaces",
-        "nodes": f"oc --context={cluster_context} get nodes",
-        "describe_nodes": f"oc --context={cluster_context} describe nodes",
-        "top_nodes": f"oc --context={cluster_context} adm top nodes",
-        "top_pods": f"oc --context={cluster_context} adm top pods --all-namespaces",
-        "network_config": f"oc --context={cluster_context} get network.config/cluster -o yaml",
-        "pvc": f"oc --context={cluster_context} get pvc --all-namespaces",
-        "pv": f"oc --context={cluster_context} get pv --all-namespaces",
-        "describe_storageclass": f"oc --context={cluster_context} describe storageclass",
-        "pods_labels": f"oc --context={cluster_context} get pods --show-labels --all-namespaces",
-        "events": f"oc --context={cluster_context} get events --sort-by='.metadata.creationTimestamp'",
-        "scc": f"oc --context={cluster_context} get scc",
-        "clusteroperators": f"oc --context={cluster_context} get clusteroperators",
-        "pods_details": f"oc --context={cluster_context} describe pods --all-namespaces",
-        "services": f"oc --context={cluster_context} get services --all-namespaces",
-        "ingresses": f"oc --context={cluster_context} get ingresses --all-namespaces",
-        "roles": f"oc --context={cluster_context} get roles --all-namespaces",
-        "rolebindings": f"oc --context={cluster_context} get rolebindings --all-namespaces"
-    }
+    Recursively generates HTML for directory structure.
+    """
+    html = "<ul>"
+    for item in sorted(os.listdir(path)):
+        item_path = os.path.join(path, item)
+        web_path = os.path.join(base_path, item)
+        if os.path.isdir(item_path):
+            html += f'<li><span class="folder">{item}</span>'
+            html += generate_directory_tree_html(item_path, web_path + "/")
+            html += '</li>'
+        else:
+            html += f'<li><a href="#" onclick="loadFile(\'{web_path}\')">{item}</a></li>'
+    html += "</ul>"
+    return html
 
-    for key, cmd in commands.items():
-        output = run_command(cmd)
-        output_path = os.path.join(output_dir, f"{cluster_context}_{key}.txt")
-        with open(output_path, 'w') as file:
-            file.write(output)
-        print(f"Output for {key} written to {output_path}")
+def create_index_html(output_dir):
+    """
+    Create an index.html file in the output directory.
+    """
+    html_content = f"""
+    <html>
+    <head>
+        <title>Cluster Output Files</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; display: flex; }}
+            #directoryTree {{ width: 300px; overflow-y: auto; height: 100vh; border-right: 1px solid #ccc; padding: 10px; }}
+            #contentPane {{ flex-grow: 1; padding: 10px; }}
+            .folder {{ font-weight: bold; }}
+            ul {{ list-style-type: none; }}
+            li {{ margin: 5px 0; }}
+            a {{ text-decoration: none; color: blue; }}
+            a:hover {{ text-decoration: underline; }}
+        </style>
+        <script>
+            function loadFile(url) {{
+                fetch(url)
+                    .then(response => response.text())
+                    .then(text => document.getElementById('contentPane').innerText = text)
+                    .catch(err => console.error(err));
+            }}
+        </script>
+    </head>
+    <body>
+        <div id="directoryTree">
+            <h3>Directory Structure</h3>
+            {generate_directory_tree_html(output_dir)}
+        </div>
+        <div id="contentPane">
+            <h3>Content Viewer</h3>
+            Click on a file to view its contents here.
+        </div>
+    </body>
+    </html>
+    """
+    with open(os.path.join(output_dir, "index.html"), "w") as f:
+        f.write(html_content)
 
-    for key, cmd in commands.items():
-        output = run_command(cmd)
-        output_path = os.path.join(output_dir, f"{cluster_context}_{key}.txt")
-        with open(output_path, 'w') as file:
-            file.write(output)
-        print(f"Output for {key} written to {output_path}")
-
-def collect_resource_utilization(cluster_context, output_file):
-    """Collects resource utilization metrics using oc commands."""
-    print(f"Collecting resource utilization metrics for cluster: {cluster_context}")
-    nodes_output = run_command(f"oc --context={cluster_context} adm top nodes")
-    pods_output = run_command(f"oc --context={cluster_context} adm top pods")
-    with open(output_file, 'w') as file:
-        file.write(nodes_output + '\n' + pods_output)
-
-def collect_tekton_metrics(cluster_context, output_file):
-    """Collect Tekton pipeline metrics using the Tekton CLI."""
-    print(f"Collecting Tekton pipeline metrics for cluster: {cluster_context}")
-    pipeline_output = run_command(f"tkn --context={cluster_context} pipeline list")
-    taskrun_output = run_command(f"tkn --context={cluster_context} taskrun list")
-    with open(output_file, 'w') as file:
-        file.write(pipeline_output + '\n' + taskrun_output)
-
-def collect_network_performance(cluster_context, output_file):
-    """Measure network performance using network testing tools like iperf, ping, and traceroute."""
-    print(f"Collecting network performance metrics for cluster: {cluster_context}")
-    iperf_output = run_command(f"iperf -c {os.getenv('IPERF_HOST', 'git-repo-host')} -t 60")
-    ping_output = run_command(f"ping {os.getenv('PING_HOST', 'git-repo-host')} -c 4")
-    traceroute_output = run_command(f"traceroute {os.getenv('TRACEROUTE_HOST', 'git-repo-host')}")
-    with open(output_file, 'w') as file:
-        file.write(iperf_output + '\n' + ping_output + '\n' + traceroute_output)
-
-def collect_git_repo_info(git_repo_url, output_file):
-    """Collect Git repository information by cloning and analyzing the repository."""
-    print(f"Collecting Git repository information: {git_repo_url}")
-    clone_output = run_command(f"git clone --bare {git_repo_url} tmp-repo")
-    size_output = run_command("du -sh tmp-repo")
-    commit_count_output = run_command("git -C tmp-repo rev-list --count HEAD")
-    run_command("rm -rf tmp-repo")
-    with open(output_file, 'w') as file:
-        file.write(size_output + '\n' + commit_count_output)
-
-def collect_namespace_metrics(cluster_context, output_file):
-    """Collect namespace-level metrics using oc commands."""
-    print(f"Collecting namespace-level metrics for cluster: {cluster_context}")
-    namespaces_output = run_command(f"oc --context={cluster_context} get namespaces")
-    pods_output = run_command(f"oc --context={cluster_context} get pods --all-namespaces")
-    quotas_output = run_command(f"oc --context={cluster_context} get resourcequotas --all-namespaces")
-    with open(output_file, 'w') as file:
-        file.write(namespaces_output + '\n' + pods_output + '\n' + quotas_output)
-
-def main(config_path):
-    """Main function to orchestrate metric collection based on the provided configuration."""
-    # Load configuration file
-    with open(config_path, 'r') as config_file:
-        config = json.load(config_file)
-
-    # Load clusters and required commands
-    clusters = {key: value for key, value in config.items() if key.startswith("Cluster")}
-    required_commands = config.get("required_commands", [])
-
-    # Setup the output directory
-    output_dir = "cluster_metrics"
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Check prerequisites before proceeding
-    if required_commands:
-        check_prerequisites(required_commands)
-
-    # Process each cluster based on the configuration
-    for cluster_name, cluster_info in clusters.items():
-        context = cluster_info["context"]
-        print(f"Processing {cluster_name} with context {context}")
-    # Create a directory for each cluster's outputs, if it does not already exist
-    cluster_output_dir = os.path.join(output_dir, cluster_name)
-    os.makedirs(cluster_output_dir, exist_ok=True)
-
-    # Collect general information about the cluster
-    collect_cluster_info(context, cluster_output_dir)
-
-    # Collect resource utilization metrics and save them to a specific file within the cluster's directory
-    resource_utilization_file = os.path.join(cluster_output_dir, f"{cluster_name}_resource_utilization.txt")
-    collect_resource_utilization(context, resource_utilization_file)
-
-    # Assuming other functions such as collect_tekton_metrics, collect_network_performance, etc. are defined elsewhere
-    # Collect Tekton pipeline metrics
-    tekton_metrics_file = os.path.join(cluster_output_dir, f"{cluster_name}_tekton_metrics.txt")
-    collect_tekton_metrics(context, tekton_metrics_file)
-
-    # Collect network performance metrics
-    network_performance_file = os.path.join(cluster_output_dir, f"{cluster_name}_network_performance.txt")
-    collect_network_performance(context, network_performance_file)
-
-    # Collect git repository information
-    git_repo_info_file = os.path.join(cluster_output_dir, f"{cluster_name}_git_repo_info.txt")
-    collect_git_repo_info("https://example.com/git-repo.git", git_repo_info_file)  # Replace the URL with actual Git repository URL
-
-    # Collect namespace-level metrics
-    namespace_metrics_file = os.path.join(cluster_output_dir, f"{cluster_name}_namespace_metrics.txt")
-    collect_namespace_metrics(context, namespace_metrics_file)
-
-    print(f"All data collection for {cluster_name} completed and saved in {cluster_output_dir}")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="OpenShift Diagnostic Tool")
-    parser.add_argument('--config', type=str, default='config.json', help='Path to configuration file')
-    args = parser.parse_args()
-    main(args.config)
-
-
-
-    Reason for script
-    
-While OpenShift dashboards and tools like Grafana provide real-time monitoring and visualizations of cluster metrics, the script-based approach to collecting and analyzing data from multiple clusters offers several distinct advantages, especially in environments where detailed, customized, or historical analysis is required. Here are some ways in which script-based data collection and analysis can complement or enhance the insights provided by Grafana and OpenShift dashboards:
-
-1. Customized Data Collection
-Specific Metrics: Scripts can be tailored to collect very specific data that may not be available through standard monitoring tools, or data that needs to be collected in a particular format.
-Deep Dives: Scripts allow for deep dives into specific areas of interest, such as security configurations (SCC, roles, and bindings), detailed pod or node descriptions, or Tekton pipeline metrics, which might not be readily accessible or detailed in generic dashboards.
-2. Cross-Cluster Comparisons
-Standardization: Scripts can ensure data is collected in exactly the same way across different clusters, which simplifies direct comparisons.
-Automation: Scripting can automate the process of comparing configurations and performance metrics across clusters, which is particularly useful in environments with multiple clusters.
-3. Historical Data Analysis
-Data Retention: Scripts can store data snapshots over time, allowing for historical analysis that might not be possible with real-time tools where data is only retained for a limited period.
-Trend Analysis: With historical data, scripts can help identify trends or patterns in resource usage or performance, which are crucial for capacity planning and forecasting.
-4. Complex Analysis Workflows
-Integration with Analysis Tools: Scripted data can be easily integrated into more complex data analysis workflows involving tools like Python (Pandas, NumPy), R, or specialized statistical software.
-Custom Reports: Scripts can generate customized reports that include specific analyses, summaries, and visualizations tailored to the needs of different stakeholders.
-5. Operational and Configuration Audits
-Configuration Drift: Scripts can be used to perform detailed configuration audits to check for drifts or discrepancies against baseline configurations across clusters.
-Compliance Checks: Regularly scheduled scripts can help ensure compliance with internal standards or external regulations by systematically checking configurations and settings.
-6. Enhanced Debugging and Troubleshooting
-Detailed Logs and Metrics: In the event of issues, scripts can collect detailed logs and metrics that are crucial for troubleshooting but may not be retained or visualized on dashboards.
-Reproducibility: Having a script that can be run at any time provides a repeatable method to collect diagnostic data which can be crucial during incident response.
+# Example usage, make sure to specify the correct output directory path
+output_dir = "/path/to/your/cluster_metrics_directory"
+create_index_html(output_dir)
