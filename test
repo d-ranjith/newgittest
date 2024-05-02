@@ -1,25 +1,30 @@
-#
-# Script Name: launch_diagnostics_and_serve.sh
-#
-# Description:
-#   This Bash script automates the process of running a Python script that generates
-#   diagnostics data for OpenShift/Tekton/Kubernetes clusters and then starts a
-#   built-in Python HTTP server to serve the results through an interactive HTML interface.
-#   The script ensures that any user on the same network can access the diagnostics information
-#   via a web browser.
-#
-# Usage:
-#   1. Ensure that Python 3.x is installed and accessible.
-#   2. Place this script in the same directory as your Python script.
-#   3. Make sure this script has executable permissions:
-#      $ chmod +x launch_diagnostics_and_serve.sh
-#   4. Execute the script:
-#      $ ./launch_diagnostics_and_serve.sh
-#   5. Once the server starts, access the diagnostics view from any machine in the network by:
-#      http://<server-ip>:8000/
-#      Replace '<server-ip>' with the actual IP address of the machine where the server is running.
-#
-# Security Note:
-#   - The HTTP server launched by this script is for temporary use in controlled environments.
-#     It is not secure for production environments as it lacks HTTPS and authentication mechanisms.
-#
+# Use the Windows Server Core 2022 image with IIS installed
+FROM mcr.microsoft.com/windows/servercore/iis:windowsservercore-ltsc2022
+
+# Enable IIS features (if not already enabled, typically these are enabled in IIS images)
+RUN powershell -Command \
+    Add-WindowsFeature Web-Server; \
+    Add-WindowsFeature NET-Framework-45-ASPNET; \
+    Add-WindowsFeature Web-Asp-Net45
+
+# Create a new directory for the website files
+RUN mkdir C:\inetpub\wwwroot\myapp
+
+# Copy the website files from the host to the container
+COPY ./myapp/ C:\inetpub\wwwroot\myapp
+
+# Configure IIS to point to the new directory
+RUN powershell -Command \
+    Import-Module IISAdministration; \
+    $sm = Get-IISServerManager; \
+    $sm.Sites['Default Web Site'].Applications['/'].VirtualDirectories['/'].PhysicalPath = 'C:\inetpub\wwwroot\myapp'; \
+    $sm.CommitChanges()
+
+# Set up environment variables, if necessary
+# ENV example_key example_value
+
+# Expose port 80 for HTTP access to the site
+EXPOSE 80
+
+# Start IIS service
+ENTRYPOINT ["C:\\ServiceMonitor.exe", "w3svc"]
