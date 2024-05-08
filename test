@@ -1,30 +1,122 @@
-# Use the Windows Server Core 2022 image with IIS installed
-FROM mcr.microsoft.com/windows/servercore/iis:windowsservercore-ltsc2022
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, UploadFile, File
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import jwt, JWTError
+from datetime import datetime, timedelta
+from pydantic import BaseModel
+import uvicorn
 
-# Enable IIS features (if not already enabled, typically these are enabled in IIS images)
-RUN powershell -Command \
-    Add-WindowsFeature Web-Server; \
-    Add-WindowsFeature NET-Framework-45-ASPNET; \
-    Add-WindowsFeature Web-Asp-Net45
+# Setup the FastAPI app and JWT Authentication
+app = FastAPI(title="Diagnostics API", version="1.0")
 
-# Create a new directory for the website files
-RUN mkdir C:\inetpub\wwwroot\myapp
+SECRET_KEY = "a_very_secret_key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 120
 
-# Copy the website files from the host to the container
-COPY ./myapp/ C:\inetpub\wwwroot\myapp
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# Configure IIS to point to the new directory
-RUN powershell -Command \
-    Import-Module IISAdministration; \
-    $sm = Get-IISServerManager; \
-    $sm.Sites['Default Web Site'].Applications['/'].VirtualDirectories['/'].PhysicalPath = 'C:\inetpub\wwwroot\myapp'; \
-    $sm.CommitChanges()
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
-# Set up environment variables, if necessary
-# ENV example_key example_value
+class TokenData(BaseModel):
+    username: str
 
-# Expose port 80 for HTTP access to the site
-EXPOSE 80
+class UserInDB(BaseModel):
+    username: str
+    hashed_password: str
 
-# Start IIS service
-ENTRYPOINT ["C:\\ServiceMonitor.exe", "w3svc"]
+def fake_hash_password(password: str):
+    return "fakehashed" + password
+
+async def authenticate_user(username: str, password: str):
+    # Placeholder for user authentication
+    fake_user_db = {
+        "johndoe": {
+            "username": "johndoe",
+            "hashed_password": fake_hash_password("secret")
+        }
+    }
+    user = fake_user_db.get(username)
+    if not user:
+        return False
+    if not fake_hash_password(password) == user['hashed_password']:
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+@app.post("/token", response_model=Token)
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = await authenticate_user(form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user['username']}, expires_delta=access_token_expires
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
+import json
+
+@app.post("/submit-task/")
+async def submit_task(config: CustomConfig, background_tasks: BackgroundTasks, token: str = Depends(oauth2_scheme)):
+    task_id = str(uuid.uuid4())
+    task_path = f"./tasks/{task_id}"
+    os.makedirs(task_path, exist_ok=True)
+    with open(f"{task_path}/config.json", "w") as f:
+        json.dump(config.dict(), f)
+    background_tasks.add_task(process_task, task_id, config)
+    return {"task_id": task_id, "message": "Task submitted successfully."}
+
+@app.get("/task-status/{task_id}")
+async def task_status(task_id: str, token: str = Depends(oauth2_scheme)):
+    task_path = f"./tasks/{task_id}/progress.json"
+    if os.path.exists(task_path):
+        with open(task_path, "r") as f:
+            progress = json.load(f)
+        return {"task_id": task_id, "progress": progress}
+    else:
+        return {"task_id": task_id, "progress": "Task not started or progress file missing"}
+
+
+uvicorn api:app --reload
+
+
+app = FastAPI(title="Diagnostics API", version="1.0")
+
+@app.get("/v1/task-status/{task_id}")
+async def task_status_v1(task_id: str):
+    return {"task_id": task_id, "status": "Pending"}
+
+
+export SECRET_KEY="your_generated_secret_key_here"
+dotenv.Example .env file:
+SECRET_KEY=your_generated_secret_key_here
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # This method will load variables from .env
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+
+import secrets
+
+def generate_secret_key():
+    return secrets.token_urlsafe(32)  # Generates a 32-byte (256-bit) URL-safe secret key
+
+if __name__ == "__main__":
+    secret_key = generate_secret_key()
+    print("Generated Secret Key:", secret_key)
+
+
+
