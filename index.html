@@ -1,75 +1,59 @@
-Revised CI/CD Deployment Use Cases with External Databases
-Database Schema Management with External Connectivity
+1. Developer Experience Use Cases
+Objective: Enable seamless development, testing, and deployment, while accommodating various database sizes and providing consistency across environments.
 
-Scenario: Ensure schema changes are versioned and managed consistently across external databases.
-Implementation:
-Tekton CI: Integrate database migration tools (e.g., Flyway or Liquibase) within Tekton tasks to apply schema changes directly to the external databases.
-Harness CD: Manage deployments by connecting to the external databases and executing migration scripts as part of the deployment process.
-Automated Helm Chart Deployment for External Services
+Automated Environment Provisioning:
 
-Scenario: Deploy application updates and associated database schema changes simultaneously while ensuring connectivity to external databases.
-Implementation:
-Tekton CI: Build Helm charts that include configurations for connecting to external databases.
-Harness CD: Deploy these Helm charts to application services while handling database migrations on the external servers.
-Environment-Specific Configuration Management
+Small Databases: Use Tekton CI to spin up lightweight Oracle database instances within containers for isolated dev and testing cycles.
+Medium and Large Databases: Leverage shared development database instances with external connections configured in Tekton, reducing the setup for developers while still providing controlled access.
+Future Scaling (SQL Server, MongoDB, Snowflake): Automate provisioning via API integrations. Use Helm charts or Tekton tasks to configure external database instances, providing database-specific settings and parameters.
+Streamlined Database Migrations:
 
-Scenario: Manage configurations for external databases separately for each environment (development, UAT, production).
-Implementation:
-Tekton CI: Store connection strings and environment-specific variables in a secure configuration management system.
-Harness CD: Inject these configurations dynamically during the deployment process based on the target environment.
-Approval Workflow for Database Changes
+Tekton CI: Integrate Flyway or Liquibase for schema versioning directly in CI, packaging migration scripts into container images or Helm charts. Deploy migrations to dev/uat environments for feature branches.
+Harness CD: Use Harness to run incremental migration scripts in the deployment pipeline when a pull request is merged into master/main. This process applies migrations automatically, incorporating rollback scripts where needed.
+Parallel Testing for DB Changes:
 
-Scenario: Require DBA approval before executing database migrations in production.
-Implementation:
-Tekton CI: Implement validation tests that run against the external databases in development and UAT.
-Harness CD: Set up approval gates requiring DBA validation for changes before executing them against the production database.
-Rollback Mechanism for Database Changes
+Tekton CI: Leverage Tekton tasks to create parallel, ephemeral test environments in OpenShift, allowing multiple devs to run migration tests without database contention.
+Harness CD: Harness can spin up temporary UAT instances if needed to test production-like database configurations.
+Unified Logging and Monitoring:
 
-Scenario: Facilitate easy rollback of schema changes applied to external databases.
-Implementation:
-Tekton CI: Create rollback scripts for database changes and store them alongside the migrations.
-Harness CD: Utilize Harness's rollback functionality to execute these scripts if needed, ensuring database integrity.
-Cross-Environment Testing
+Tekton and Harness Integration: Implement centralized logging (e.g., with ELK stack) to capture and analyze pipeline logs, ensuring insights into errors at each stage.
+Performance Metrics: Use Prometheus and Grafana dashboards to monitor database health metrics like latency or failed queries across all environments.
+2. CI Security and Linting Use Cases
+Objective: Protect the CI/CD process and enforce database security standards, especially vital for databases with sensitive data.
 
-Scenario: Validate database migrations in a staging environment that mirrors production but connects to a test instance of the external database.
-Implementation:
-Tekton CI: Create a testing pipeline that deploys the application to a staging environment with a test database.
-Harness CD: Ensure the application is thoroughly tested against the test database before moving to production.
-Database Performance Monitoring Post-Deployment
+Database Configuration Linting:
 
-Scenario: Monitor the performance of the external database after deployment to detect issues early.
-Implementation:
-Tekton CI: Use performance monitoring scripts as part of the CI process to establish baseline metrics.
-Harness CD: Integrate monitoring tools to track performance metrics post-deployment, triggering alerts if performance degrades.
-Data Security and Compliance Checks
+Tekton CI: Add linters to validate SQL scripts for naming conventions, best practices, and configuration standards, ensuring that databases follow security policies.
+Harness CD: Use compliance checks (e.g., PCI, GDPR) as gates in Harness for production deployments, blocking non-compliant changes from deploying.
+SQL Injection and Security Scanning:
 
-Scenario: Ensure that all database migrations comply with data security and privacy regulations.
-Implementation:
-Tekton CI: Run automated security checks on migration scripts to identify potential vulnerabilities.
-Harness CD: Validate compliance checks as part of the deployment process, blocking unauthorized changes.
-Data Migration and Synchronization
+Tekton CI: Run static analysis tools on SQL scripts to flag risky queries or vulnerable SQL patterns before deployment.
+Harness CD: For production deployments, incorporate security scans as pre-deployment steps to validate compliance and data security.
+Secrets Management:
 
-Scenario: Facilitate data migrations or synchronization tasks for databases during deployments.
-Implementation:
-Tekton CI: Prepare scripts for data migration tasks and test them in the CI pipeline.
-Harness CD: Execute these migration scripts as part of the deployment process, ensuring data integrity and consistency.
-Incremental Database Changes
+Tekton CI and Harness CD: Use OpenShift secrets for database credentials during Tekton tasks. Harness provides additional secret management and role-based access control (RBAC) to securely handle sensitive environment configurations.
+Automated Backup Before Migration:
 
-Scenario: Use incremental migration scripts to manage small changes to the database schema over time.
-Implementation:
-Tekton CI: Structure migration scripts in a way that supports incremental updates.
-Harness CD: Ensure the deployment process applies these incremental changes sequentially, maintaining database integrity.
-Example Workflow with External Database Connections
-CI Pipeline in Tekton:
+Tekton CI: Create tasks to back up non-production databases before migration scripts are run.
+Harness CD: Automate backups for production databases before migration steps, ensuring quick rollback points and disaster recovery.
+3. CD Deployment Scenarios
+Objective: Support flexible deployment strategies with automatic/manual/zero-click options and ensure rollback for different database sizes.
 
-Step 1: A developer commits changes to the application code and database migration scripts.
-Step 2: Tekton triggers a pipeline that builds container images, packages Helm charts, and applies migrations to a development instance of the external database.
-Step 3: Validation tests run against the development database to ensure all changes work as expected.
-CD Pipeline in Harness:
+Deployment Scenarios by Database Size:
 
-Step 1: Harness initiates a CD pipeline that pulls Helm charts and migration scripts for deployment.
-Step 2: The pipeline deploys application changes to the UAT environment, applying database migrations to the UAT instance of the external database.
-Step 3: A manual approval step occurs, requiring DBA validation before moving changes to production.
-Step 4: Once approved, the production deployment occurs, applying migrations to the production database and tracking changes for compliance.
-Summary
-This updated structure incorporates the hosting of databases outside of OpenShift while leveraging Tekton for CI and Harness for CD. It emphasizes the importance of secure and controlled database management, approval workflows, and the integration of external databases into the deployment pipelines. By maintaining focus on collaboration between application developers and DBAs, you can ensure a smooth and compliant CI/CD process.
+Small Databases (Dev/Test Environments):
+
+Auto-Deploy: Configure CI pipelines to fully automate deployments for dev databases after CI completion without manual approvals.
+Zero-Click Deployment: Set up Harness to auto-deploy feature flags for dev and UAT environments, allowing changes to be tested with zero friction.
+Medium Databases (Staging/Pre-Prod):
+
+Manual Approval with Gates: Configure Harness to require approvals for critical changes moving from UAT to production.
+Blue-Green Deployments: Use Harness to deploy new versions in a blue-green or canary fashion, especially for staging databases, ensuring minimal downtime.
+Large Databases (Production Instances):
+
+Canary/Feature Flag Deployments: Implement Harness feature flags or canary releases for gradual deployment, allowing production rollout monitoring.
+Automated Rollbacks: Configure Harness to auto-monitor database metrics post-deployment, triggering rollbacks upon detecting anomalies like slow query performance or data inconsistency.
+Scaling for SQL Server, MongoDB, Snowflake:
+
+Database-Specific Pipelines: For each database type, build custom steps in Tekton and Harness, scaling Flyway or Liquibase configurations.
+Dynamic Environment-Specific Configurations: Set environment-specific variables and credentials for each database type within Harness, ensuring flexibility for each deployment model.
