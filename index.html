@@ -1,59 +1,1256 @@
-1. Developer Experience Use Cases
-Objective: Enable seamless development, testing, and deployment, while accommodating various database sizes and providing consistency across environments.
+database-migration-tool/
+├── core-lib/                                       # Core library for the migration tool
+│   ├── src/
+│   │   ├── main/
+│   │   │   ├── java/
+│   │   │   │   └── com/
+│   │   │   │       └── example/
+│   │   │   │           └── migration/
+│   │   │   │               ├── DatabaseMigrationService.java
+│   │   │   │               ├── DatabaseExecutorFactory.java
+│   │   │   │               ├── BaseDatabaseExecutor.java
+│   │   │   │               ├── FlywayMigrationTool.java
+│   │   │   │               ├── LiquibaseMigrationTool.java
+│   │   │   │               └── strategy/
+│   │   │   │                   ├── DeploymentCheck.java
+│   │   │   │                   ├── BackupCheck.java
+│   │   │   │                   ├── ValidationCheck.java
+│   │   │   │                   └── ...
+│   │   └── resources/
+│   │       └── application.properties
+│   └── pom.xml                                    # Separate pom.xml for the core library
+├── executors/                                      # Executors for specific databases
+│   ├── postgres-executor/
+│   │   ├── src/
+│   │   │   └── main/
+│   │   │       └── java/
+│   │   │           └── com/
+│   │   │               └── example/
+│   │   │                   └── executor/
+│   │   │                       ├── PostgresDatabaseExecutor.java
+│   │   │                       └── strategy/
+│   │   │                           ├── PostgresBackupCheck.java
+│   │   │                           └── PostgresValidationCheck.java
+│   │   └── pom.xml                            # Executor-specific dependencies
+│   └── oracle-executor/
+│       ├── src/
+│       │   └── main/
+│       │       └── java/
+│       │           └── com/
+│       │               └── example/
+│       │                   └── executor/
+│       │                       ├── OracleDatabaseExecutor.java
+│       │                       └── strategy/
+│       │                           ├── OracleBackupCheck.java
+│       │                           └── OracleValidationCheck.java
+│       └── pom.xml                        # Executor-specific dependencies
+├── helm/                                       # Helm chart for deployment
+│   ├── Chart.yaml
+│   ├── values.yaml
+│   └── templates/
+│       └── deployment.yaml
+├── scripts/                                    # Utility scripts for running/testing migrations locally
+│   ├── run_migration.ps1
+│   └── setup_env.ps1
+├── parent-pom.xml                              # Parent POM to manage modules and dependencies
+└── Dockerfile                                  # Dockerfile for containerizing the service
 
-Automated Environment Provisioning:
+# Define the root directory for the project
+$projectRoot = "C:\path\to\database-migration-tool"
 
-Small Databases: Use Tekton CI to spin up lightweight Oracle database instances within containers for isolated dev and testing cycles.
-Medium and Large Databases: Leverage shared development database instances with external connections configured in Tekton, reducing the setup for developers while still providing controlled access.
-Future Scaling (SQL Server, MongoDB, Snowflake): Automate provisioning via API integrations. Use Helm charts or Tekton tasks to configure external database instances, providing database-specific settings and parameters.
-Streamlined Database Migrations:
+# Define the directories to create
+$directories = @(
+    "core-lib/src/main/java/com/example/migration",
+    "core-lib/src/main/java/com/example/migration/strategy",
+    "core-lib/src/main/resources",
+    "executors/postgres-executor/src/main/java/com/example/executor",
+    "executors/oracle-executor/src/main/java/com/example/executor",
+    "api-service/src/main/java/com/example/api",
+    "api-service/src/main/java/com/example/api/security",
+    "api-service/src/main/resources/META-INF/resources",
+    "common-utils/src/main/java/com/example/utils",
+    "executors/postgres-executor/src/main/java/com/example/executor",
+    "executors/postgres-executor/src/main/java/com/example/executor/strategy",
+    "executors/oracle-executor/src/main/java/com/example/executor",
+    "executors/oracle-executor/src/main/java/com/example/executor/strategy",
+    "helm/templates",
+    "scripts"
+)
 
-Tekton CI: Integrate Flyway or Liquibase for schema versioning directly in CI, packaging migration scripts into container images or Helm charts. Deploy migrations to dev/uat environments for feature branches.
-Harness CD: Use Harness to run incremental migration scripts in the deployment pipeline when a pull request is merged into master/main. This process applies migrations automatically, incorporating rollback scripts where needed.
-Parallel Testing for DB Changes:
+# Create the directories
+foreach ($dir in $directories) {
+    New-Item -Path (Join-Path $projectRoot $dir) -ItemType Directory -Force
+}
 
-Tekton CI: Leverage Tekton tasks to create parallel, ephemeral test environments in OpenShift, allowing multiple devs to run migration tests without database contention.
-Harness CD: Harness can spin up temporary UAT instances if needed to test production-like database configurations.
-Unified Logging and Monitoring:
+# Define the files to create with initial content where applicable
+$files = @{
+    "core-lib/src/main/java/com/example/migration/DatabaseMigrationService.java" = @"
+package com.example.migration;
 
-Tekton and Harness Integration: Implement centralized logging (e.g., with ELK stack) to capture and analyze pipeline logs, ensuring insights into errors at each stage.
-Performance Metrics: Use Prometheus and Grafana dashboards to monitor database health metrics like latency or failed queries across all environments.
-2. CI Security and Linting Use Cases
-Objective: Protect the CI/CD process and enforce database security standards, especially vital for databases with sensitive data.
+import javax.inject.Inject;
+import java.util.Map;
 
-Database Configuration Linting:
+public class DatabaseMigrationService {
 
-Tekton CI: Add linters to validate SQL scripts for naming conventions, best practices, and configuration standards, ensuring that databases follow security policies.
-Harness CD: Use compliance checks (e.g., PCI, GDPR) as gates in Harness for production deployments, blocking non-compliant changes from deploying.
-SQL Injection and Security Scanning:
+    @Inject
+    DatabaseExecutorFactory executorFactory;
 
-Tekton CI: Run static analysis tools on SQL scripts to flag risky queries or vulnerable SQL patterns before deployment.
-Harness CD: For production deployments, incorporate security scans as pre-deployment steps to validate compliance and data security.
-Secrets Management:
+    public void executeMigration(String databaseType, Map<String, String> userConfig) {
+        try {
+            BaseDatabaseExecutor executor = executorFactory.getExecutor(databaseType);
+            executor.executeMigration(userConfig);
+        } catch (Exception e) {
+            throw new RuntimeException("Migration failed: " + e.getMessage());
+        }
+    }
+}
+"@
 
-Tekton CI and Harness CD: Use OpenShift secrets for database credentials during Tekton tasks. Harness provides additional secret management and role-based access control (RBAC) to securely handle sensitive environment configurations.
-Automated Backup Before Migration:
+    "core-lib/src/main/java/com/example/migration/DatabaseExecutorFactory.java" = @"
+package com.example.migration;
 
-Tekton CI: Create tasks to back up non-production databases before migration scripts are run.
-Harness CD: Automate backups for production databases before migration steps, ensuring quick rollback points and disaster recovery.
-3. CD Deployment Scenarios
-Objective: Support flexible deployment strategies with automatic/manual/zero-click options and ensure rollback for different database sizes.
+public class DatabaseExecutorFactory {
 
-Deployment Scenarios by Database Size:
+    public BaseDatabaseExecutor getExecutor(String databaseType) {
+        switch (databaseType.toLowerCase()) {
+            case "oracle":
+                return new OracleDatabaseExecutor();
+            case "postgres":
+                return new PostgresDatabaseExecutor();
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + databaseType);
+        }
+    }
+}
+"@
 
-Small Databases (Dev/Test Environments):
+    "core-lib/pom.xml" = "<project>...</project>"
+    "executors/postgres-executor/pom.xml" = "<project>...</project>"
+    "executors/oracle-executor/pom.xml" = "<project>...</project>"
+    "parent-pom.xml" = "<project>...</project>"
+    "Dockerfile" = "FROM openjdk:11-jre\n# Docker setup"
+    "helm/Chart.yaml" = "apiVersion: v2\nname: database-migration-tool\n"
+    "helm/values.yaml" = "replicaCount: 1\n"
+    "helm/templates/deployment.yaml" = "<Deployment template>"
+    "scripts/run_migration.ps1" = "Write-Host 'Running migration...'"
+    "scripts/setup_env.ps1" = "Write-Host 'Setting up environment...'"
+    # Executors
+    "executors/postgres-executor/pom.xml" = "<project>...</project>"
+    "executors/oracle-executor/pom.xml" = "<project>...</project>"
 
-Auto-Deploy: Configure CI pipelines to fully automate deployments for dev databases after CI completion without manual approvals.
-Zero-Click Deployment: Set up Harness to auto-deploy feature flags for dev and UAT environments, allowing changes to be tested with zero friction.
-Medium Databases (Staging/Pre-Prod):
+    # API Service
+    "api-service/src/main/java/com/example/api/MigrationController.java" = @"
+package com.example.api;
 
-Manual Approval with Gates: Configure Harness to require approvals for critical changes moving from UAT to production.
-Blue-Green Deployments: Use Harness to deploy new versions in a blue-green or canary fashion, especially for staging databases, ensuring minimal downtime.
-Large Databases (Production Instances):
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-Canary/Feature Flag Deployments: Implement Harness feature flags or canary releases for gradual deployment, allowing production rollout monitoring.
-Automated Rollbacks: Configure Harness to auto-monitor database metrics post-deployment, triggering rollbacks upon detecting anomalies like slow query performance or data inconsistency.
-Scaling for SQL Server, MongoDB, Snowflake:
+@RestController
+public class MigrationController {
 
-Database-Specific Pipelines: For each database type, build custom steps in Tekton and Harness, scaling Flyway or Liquibase configurations.
-Dynamic Environment-Specific Configurations: Set environment-specific variables and credentials for each database type within Harness, ensuring flexibility for each deployment model.
+    @GetMapping("/migrate")
+    public String initiateMigration() {
+        return "Migration initiated";
+    }
+}
+"@
+
+    "api-service/src/main/java/com/example/api/SwaggerConfig.java" = @"
+package com.example.api;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import springfox.documentation.builders.RequestHandlerSelectors;
+import springfox.documentation.spi.DocumentationType;
+import springfox.documentation.spring.web.plugins.Docket;
+
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public Docket api() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .select()
+                .apis(RequestHandlerSelectors.basePackage("com.example.api"))
+                .build();
+    }
+}
+"@
+
+    "api-service/src/main/java/com/example/api/security/AuthConfig.java" = @"
+package com.example.api.security;
+
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class AuthConfig {
+    // Placeholder for auth configuration, e.g., OAuth2 or Basic Auth
+}
+"@
+
+    "api-service/src/main/resources/application-api.properties" = "server.port=8080"
+
+    # Common Utilities
+    "common-utils/src/main/java/com/example/utils/DatabaseType.java" = @"
+package com.example.utils;
+
+public enum DatabaseType {
+    POSTGRES, ORACLE, MYSQL;
+}
+"@
+
+    "common-utils/src/main/java/com/example/utils/ConfigHelper.java" = @"
+package com.example.utils;
+
+public class ConfigHelper {
+    public static String getConfig(String key) {
+        // Placeholder for configuration management
+        return System.getProperty(key);
+    }
+}
+"@
+
+    "common-utils/src/main/java/com/example/utils/LoggerConfig.java" = @"
+package com.example.utils;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class LoggerConfig {
+    public static Logger getLogger(Class<?> clazz) {
+        return LoggerFactory.getLogger(clazz);
+    }
+}
+"@
+
+    "common-utils/pom.xml" = "<project>...</project>"
+
+    # Helm Chart
+    "helm/Chart.yaml" = "apiVersion: v2\nname: database-migration-tool\n"
+    "helm/values.yaml" = "replicaCount: 1\n"
+
+    # Scripts
+    "scripts/run_migration.ps1" = "Write-Host 'Running migration...'"
+    "scripts/setup_env.ps1" = "Write-Host 'Setting up environment...'"      
+}
+
+# Create the files and add content
+foreach ($filePath in $files.Keys) {
+    $fullPath = Join-Path $projectRoot $filePath
+    New-Item -Path $fullPath -ItemType File -Force | Out-Null
+    Set-Content -Path $fullPath -Value $files[$filePath]
+}
+
+Write-Host "Project structure and initial files created at $projectRoot"
+--
+
+
+DatabaseMigrationService.java
+
+package com.example.migration;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
+
+@ApplicationScoped
+@Path("/migration")
+public class DatabaseMigrationService {
+
+    @Inject
+    DatabaseExecutorFactory executorFactory;
+
+    @POST
+    @Path("/execute")
+    public Response executeMigration(@QueryParam("databaseType") String databaseType, Connection connection) {
+        try {
+            // Get the migration tool and executor
+            DatabaseMigrationTool migrationTool = executorFactory.getMigrationTool(databaseType);
+            BaseDatabaseExecutor<?> executor = executorFactory.getExecutor(databaseType, connection);
+
+            // Execute pre-deployment checks
+            if (!runChecks(preDeploymentChecks)) {
+                throw new IllegalStateException("Pre-deployment checks failed. Migration aborted.");
+            }
+
+            // Perform migration
+            migrationTool.migrate();
+            executor.executeMigration();
+
+            // Execute post-deployment checks
+            if (!runChecks(postDeploymentChecks)) {
+                executor.rollback();
+                throw new IllegalStateException("Post-deployment checks failed. Rolling back migration.");
+            }
+
+            return Response.ok("Migration completed successfully").build();
+        } catch (Exception e) {
+            return Response.status(500).entity("Migration failed: " + e.getMessage()).build();
+        }
+    }
+
+    private boolean runChecks(List<DeploymentCheck> checks) {
+        for (DeploymentCheck check : checks) {
+            if (!check.performCheck()) {
+                System.out.println("Check failed: " + check.getClass().getSimpleName());
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+DatabaseExecutorFactory.java
+
+package com.example.migration;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import java.sql.Connection;
+
+@ApplicationScoped
+public class DatabaseExecutorFactory {
+
+    @Inject
+    Flyway flyway;
+
+    @Inject
+    Liquibase liquibase;
+
+    public DatabaseMigrationTool getMigrationTool(String databaseType) {
+        switch (databaseType) {
+            case "oracle":
+                return new FlywayMigrationTool(flyway);
+            case "snowflake":
+                return new LiquibaseMigrationTool(liquibase);
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + databaseType);
+        }
+    }
+
+    public BaseDatabaseExecutor<?> getExecutor(String databaseType, Connection connection) {
+        switch (databaseType) {
+            case "oracle":
+                return new OracleExecutor(connection);
+            case "snowflake":
+                return new SnowflakeExecutor(connection);
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + databaseType);
+        }
+    }
+}
+
+pom.xml
+
+<dependencies>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-resteasy</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>io.quarkus</groupId>
+        <artifactId>quarkus-smallrye-health</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-core</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.liquibase</groupId>
+        <artifactId>liquibase-core</artifactId>
+    </dependency>
+</dependencies>
+
+
+
+MigrationHealthCheck.java
+package com.example.migration.health;
+
+import org.eclipse.microprofile.health.Health;
+import org.eclipse.microprofile.health.Liveness;
+import org.eclipse.microprofile.health.Readiness;
+import javax.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+@Liveness
+@Readiness
+@Health
+public class MigrationHealthCheck implements org.eclipse.microprofile.health.HealthCheck {
+
+    @Override
+    public org.eclipse.microprofile.health.HealthCheckResponse call() {
+        // Perform checks to verify if the service is live and ready
+        return org.eclipse.microprofile.health.HealthCheckResponse.up("Migration service is up");
+    }
+}
+
+
+FlywayMigrationTool.java
+package com.example.migration;
+
+import org.flywaydb.core.Flyway;
+import javax.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class FlywayMigrationTool implements DatabaseMigrationTool {
+
+    private final Flyway flyway;
+
+    public FlywayMigrationTool(Flyway flyway) {
+        this.flyway = flyway;
+    }
+
+    @Override
+    public void migrate() {
+        // Ensure the migration happens only once and handles Flyway-specific behavior
+        flyway.migrate();
+    }
+
+    @Override
+    public void rollback() {
+        // Rollback Flyway migrations if needed (not supported natively by Flyway, so need a custom approach)
+        flyway.undo();
+    }
+}
+
+LiquibaseMigrationTool.java
+package com.example.migration;
+
+import liquibase.Liquibase;
+import liquibase.database.Database;
+import liquibase.database.jvm.JdbcConnection;
+import liquibase.resource.FileSystemResourceAccessor;
+import javax.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class LiquibaseMigrationTool implements DatabaseMigrationTool {
+
+    private final Liquibase liquibase;
+
+    public LiquibaseMigrationTool(Database database) {
+        this.liquibase = new Liquibase("changelog.xml", new FileSystemResourceAccessor(), new JdbcConnection(database.getConnection()));
+    }
+
+    @Override
+    public void migrate() {
+        try {
+            liquibase.update("");
+        } catch (Exception e) {
+            throw new RuntimeException("Liquibase migration failed", e);
+        }
+    }
+
+    @Override
+    public void rollback() {
+        try {
+            liquibase.rollback(1, null);  // Rollback to a specific number of changes or label
+        } catch (Exception e) {
+            throw new RuntimeException("Liquibase rollback failed", e);
+        }
+    }
+}
+
+MigrationController.java
+
+package com.example.migration.rest;
+
+import com.example.migration.DatabaseMigrationService;
+import javax.inject.Inject;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
+
+@Path("/migration")
+public class MigrationController {
+
+    @Inject
+    DatabaseMigrationService migrationService;
+
+    @POST
+    @Path("/execute")
+    public Response executeMigration(@QueryParam("databaseType") String databaseType,
+                                     @QueryParam("userConfig") String userConfig) {
+        try {
+            // Trigger migration logic based on database type and configuration
+            migrationService.executeMigration(databaseType, userConfig);
+            return Response.ok("Migration completed successfully").build();
+        } catch (Exception e) {
+            return Response.status(500).entity("Migration failed: " + e.getMessage()).build();
+        }
+    }
+}
+
+MigrationHealthCheck.java
+
+package com.example.migration.health;
+
+import org.eclipse.microprofile.health.Health;
+import org.eclipse.microprofile.health.Liveness;
+import org.eclipse.microprofile.health.Readiness;
+import javax.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+@Liveness
+@Readiness
+@Health
+public class MigrationHealthCheck implements org.eclipse.microprofile.health.HealthCheck {
+
+    @Override
+    public org.eclipse.microprofile.health.HealthCheckResponse call() {
+        // Perform checks to verify if the migration service is live and ready
+        return org.eclipse.microprofile.health.HealthCheckResponse.up("Migration service is live and ready");
+    }
+}
+
+DeploymentCheck.java
+package com.example.migration.strategy;
+
+public interface DeploymentCheck {
+    boolean performCheck();
+}
+
+BackupCheck.java
+package com.example.migration.strategy;
+
+public class BackupCheck implements DeploymentCheck {
+
+    @Override
+    public boolean performCheck() {
+        // Implement backup check logic (e.g., verify backups exist and are valid)
+        return true;  // Returning true for now as a placeholder
+    }
+}
+
+ValidationCheck.java
+
+package com.example.migration.strategy;
+
+public class ValidationCheck implements DeploymentCheck {
+
+    @Override
+    public boolean performCheck() {
+        // Implement validation check (e.g., verify if migration applied correctly)
+        return true;  // Returning true for now as a placeholder
+    }
+}
+
+DatabaseMigrationService.java
+
+package com.example.migration;
+
+import com.example.migration.strategy.DeploymentCheck;
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import java.util.List;
+
+@ApplicationScoped
+public class DatabaseMigrationService {
+
+    @Inject
+    DatabaseExecutorFactory executorFactory;
+
+    @Inject
+    List<DeploymentCheck> preDeploymentChecks;
+
+    @Inject
+    List<DeploymentCheck> postDeploymentChecks;
+
+    public void executeMigration(String databaseType, String userConfig) {
+        try {
+            // Determine database connection and executor
+            DatabaseMigrationTool migrationTool = executorFactory.getMigrationTool(databaseType);
+            BaseDatabaseExecutor<?> executor = executorFactory.getExecutor(databaseType, userConfig);
+
+            // Run pre-deployment checks
+            if (!runChecks(preDeploymentChecks)) {
+                throw new IllegalStateException("Pre-deployment checks failed.");
+            }
+
+            // Perform migration
+            migrationTool.migrate();
+            executor.executeMigration();
+
+            // Run post-deployment checks
+            if (!runChecks(postDeploymentChecks)) {
+                executor.rollback();
+                throw new IllegalStateException("Post-deployment checks failed. Rolled back.");
+            }
+        } catch (Exception e) {
+            // Handle migration failure
+            throw new RuntimeException("Migration failed: " + e.getMessage());
+        }
+    }
+
+    private boolean runChecks(List<DeploymentCheck> checks) {
+        for (DeploymentCheck check : checks) {
+            if (!check.performCheck()) {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+application.properties
+
+quarkus.application.name=database-migration-service
+quarkus.http.port=8080
+quarkus.profile=prod
+
+# Flyway configuration
+flyway.url=jdbc:oracle:thin:@localhost:1521:orcl
+flyway.user=admin
+flyway.password=secret
+
+# Liquibase configuration
+liquibase.url=jdbc:oracle:thin:@localhost:1521:orcl
+liquibase.user=admin
+liquibase.password=secret
+
+# Kubernetes/Openshift specific
+quarkus.kubernetes.deploy=true
+
+
+Dockerfile
+
+FROM quay.io/quarkus/quarkus-maven:latest AS build
+
+WORKDIR /workspace
+COPY . .
+RUN mvn clean package -DskipTests
+
+FROM registry.access.redhat.com/ubi8/ubi
+COPY --from=build /workspace/target/*-runner.jar /application.jar
+ENTRYPOINT ["java", "-jar", "/application.jar"]
+
+
+BaseDatabaseExecutor.java
+
+package com.example.migration;
+
+import javax.enterprise.context.ApplicationScoped;
+import java.util.Map;
+
+@ApplicationScoped
+public abstract class BaseDatabaseExecutor {
+
+    protected abstract DeploymentCheck getPreDeploymentCheck();
+    protected abstract DeploymentCheck getPostDeploymentCheck();
+
+    protected abstract DatabaseMigrationTool getMigrationTool();
+
+    public void executeMigration(Map<String, String> userConfig) {
+        // Step 1: Run Pre-Deployment Check
+        DeploymentCheck preCheck = getPreDeploymentCheck();
+        if (!preCheck.performCheck(userConfig)) {
+            throw new IllegalStateException("Pre-deployment checks failed.");
+        }
+
+        // Step 2: Run Migration
+        DatabaseMigrationTool migrationTool = getMigrationTool();
+        migrationTool.configure(userConfig);
+        migrationTool.migrate();
+
+        // Step 3: Run Post-Deployment Check
+        DeploymentCheck postCheck = getPostDeploymentCheck();
+        if (!postCheck.performCheck(userConfig)) {
+            migrationTool.rollback();
+            throw new IllegalStateException("Post-deployment checks failed. Rolled back.");
+        }
+    }
+
+    public void rollback() {
+        getMigrationTool().rollback();
+    }
+}
+
+OracleDatabaseExecutor.java
+      
+package com.example.migration.executor;
+
+import com.example.migration.BaseDatabaseExecutor;
+import com.example.migration.strategy.DeploymentCheck;
+import com.example.migration.strategy.OracleBackupCheck;
+import com.example.migration.strategy.OracleValidationCheck;
+import com.example.migration.DatabaseMigrationTool;
+import com.example.migration.FlywayMigrationTool;
+
+import java.util.Map;
+
+public class OracleDatabaseExecutor extends BaseDatabaseExecutor {
+
+    @Override
+    protected DeploymentCheck getPreDeploymentCheck() {
+        return new OracleBackupCheck();
+    }
+
+    @Override
+    protected DeploymentCheck getPostDeploymentCheck() {
+        return new OracleValidationCheck();
+    }
+
+    @Override
+    protected DatabaseMigrationTool getMigrationTool() {
+        return new FlywayMigrationTool();  // Example: Using Flyway for Oracle
+    }
+}
+
+PostgresDatabaseExecutor.java
+      
+package com.example.migration.executor;
+
+import com.example.migration.BaseDatabaseExecutor;
+import com.example.migration.strategy.DeploymentCheck;
+import com.example.migration.strategy.PostgresBackupCheck;
+import com.example.migration.strategy.PostgresValidationCheck;
+import com.example.migration.DatabaseMigrationTool;
+import com.example.migration.LiquibaseMigrationTool;
+
+import java.util.Map;
+
+public class PostgresDatabaseExecutor extends BaseDatabaseExecutor {
+
+    @Override
+    protected DeploymentCheck getPreDeploymentCheck() {
+        return new PostgresBackupCheck();
+    }
+
+    @Override
+    protected DeploymentCheck getPostDeploymentCheck() {
+        return new PostgresValidationCheck();
+    }
+
+    @Override
+    protected DatabaseMigrationTool getMigrationTool() {
+        return new LiquibaseMigrationTool();  // Example: Using Liquibase for PostgreSQL
+    }
+}
+
+DatabaseExecutorFactory.java
+      
+package com.example.migration;
+
+import com.example.migration.executor.OracleDatabaseExecutor;
+import com.example.migration.executor.PostgresDatabaseExecutor;
+
+import javax.enterprise.context.ApplicationScoped;
+
+@ApplicationScoped
+public class DatabaseExecutorFactory {
+
+    public BaseDatabaseExecutor getExecutor(String databaseType) {
+        switch (databaseType.toLowerCase()) {
+            case "oracle":
+                return new OracleDatabaseExecutor();
+            case "postgres":
+                return new PostgresDatabaseExecutor();
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + databaseType);
+        }
+    }
+}
+
+DatabaseMigrationService.java
+      
+package com.example.migration;
+
+import javax.inject.Inject;
+import java.util.Map;
+
+@ApplicationScoped
+public class DatabaseMigrationService {
+
+    @Inject
+    DatabaseExecutorFactory executorFactory;
+
+    public void executeMigration(String databaseType, Map<String, String> userConfig) {
+        try {
+            // Get the correct executor for the database type
+            BaseDatabaseExecutor executor = executorFactory.getExecutor(databaseType);
+            executor.executeMigration(userConfig); // Execute migration with user config
+        } catch (Exception e) {
+            throw new RuntimeException("Migration failed: " + e.getMessage());
+        }
+    }
+}
+
+ MigrationController.java
+
+package com.example.migration.rest;
+
+import com.example.migration.DatabaseMigrationService;
+import javax.inject.Inject;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
+import java.util.Map;
+
+@Path("/migration")
+public class MigrationController {
+
+    @Inject
+    DatabaseMigrationService migrationService;
+
+    @POST
+    @Path("/execute")
+    public Response executeMigration(@QueryParam("databaseType") String databaseType,
+                                     @QueryParam("userConfig") Map<String, String> userConfig) {
+        try {
+            // Trigger the migration logic
+            migrationService.executeMigration(databaseType, userConfig);
+            return Response.ok("Migration completed successfully").build();
+        } catch (Exception e) {
+            return Response.status(500).entity("Migration failed: " + e.getMessage()).build();
+        }
+    }
+}
+      
+------------------
+
+database-migration-service/
+├── base-lib/                             # Core library for generic database functionality
+│   ├── src/main/java/com/example/lib/
+│   │   ├── BaseDatabaseExecutor.java      # Base template for executing migrations
+│   │   ├── DatabaseExecutorFactory.java   # Factory to create database executors based on type
+│   │   ├── MigrationService.java          # Service class orchestrating migration execution
+│   │   └── strategy/                      # Strategy pattern for pre/post deployment checks
+│   │       ├── DeploymentCheck.java       # Interface for pre/post-deployment checks
+│   │       ├── BackupCheck.java           # Pre-check to take a backup
+│   │       └── ValidationCheck.java       # Post-check to validate deployment success
+│   ├── src/main/resources/
+│   │   └── application.properties         # Basic configuration for the base-lib module
+│   └── build.gradle                       # Gradle build file for the base-lib module
+│
+├── oracle-executor/                       # Oracle-specific migration implementation
+│   ├── src/main/java/com/example/oracle/
+│   │   └── OracleExecutor.java            # Custom Oracle migration executor
+│   ├── src/main/resources/
+│   │   └── application-oracle.properties  # Oracle-specific configurations
+│   └── build.gradle                       # Gradle build file for Oracle executor
+│
+├── snowflake-executor/                    # Snowflake-specific migration implementation
+│   ├── src/main/java/com/example/snowflake/
+│   │   └── SnowflakeExecutor.java         # Custom Snowflake migration executor
+│   ├── src/main/resources/
+│   │   └── application-snowflake.properties # Snowflake-specific configurations
+│   └── build.gradle                       # Gradle build file for Snowflake executor
+│
+├── api-service/                           # REST API module for exposing migration functionality
+│   ├── src/main/java/com/example/api/
+│   │   ├── MigrationController.java       # REST controller for migration operations
+│   │   ├── SwaggerConfig.java             # Swagger configuration for API documentation
+│   │   └── security/                      # Security configuration for the API
+│   │       ├── AuthConfig.java            # Basic Auth/OAuth configuration for secure API
+│   ├── src/main/resources/
+│   │   ├── application-api.properties     # General configurations for the API module
+│   │   ├── META-INF/resources/            # Swagger UI configurations
+│   └── build.gradle                       # Gradle build file for API module
+│
+├── common-utils/                          # Shared utilities and constants across modules
+│   ├── src/main/java/com/example/utils/
+│   │   ├── DatabaseType.java              # Enum for different database types
+│   │   ├── ConfigHelper.java              # Helper for configuration management
+│   │   └── LoggerConfig.java              # Utility for logging setup
+│   └── build.gradle                       # Gradle build file for common-utils module
+│
+├── helm/                                  # Helm chart for deploying the service to Kubernetes
+│   ├── templates/                         # Kubernetes deployment, service, and config maps
+│   ├── values.yaml                        # Default Helm values for configuration
+│   └── Chart.yaml                         # Helm chart metadata
+│
+├── Dockerfile                             # Dockerfile to containerize the application
+├── build.gradle                           # Root Gradle build file to manage all sub-modules
+└── settings.gradle                        # Settings file to define the multi-module project
+
+
+
+# Root directory for the project
+$rootDir = "C:\path\to\your\project\database-migration-service"
+
+# Define the folder structure
+$folders = @(
+    "$rootDir\base-lib\src\main\java\com\example\lib",
+    "$rootDir\base-lib\src\main\resources",
+    "$rootDir\oracle-executor\src\main\java\com\example\oracle",
+    "$rootDir\oracle-executor\src\main\resources",
+    "$rootDir\snowflake-executor\src\main\java\com\example\snowflake",
+    "$rootDir\snowflake-executor\src\main\resources",
+    "$rootDir\api-service\src\main\java\com\example\api",
+    "$rootDir\api-service\src\main\java\com\example\api\security",
+    "$rootDir\api-service\src\main\resources\META-INF\resources",
+    "$rootDir\common-utils\src\main\java\com\example\utils",
+    "$rootDir\helm\templates"
+)
+
+# Create each folder
+foreach ($folder in $folders) {
+    New-Item -ItemType Directory -Force -Path $folder
+}
+
+# Create root-level files
+New-Item -ItemType File -Path "$rootDir\Dockerfile"
+New-Item -ItemType File -Path "$rootDir\build.gradle"
+New-Item -ItemType File -Path "$rootDir\settings.gradle"
+New-Item -ItemType File -Path "$rootDir\helm\values.yaml"
+New-Item -ItemType File -Path "$rootDir\helm\Chart.yaml"
+
+Write-Output "Folder structure created successfully at $rootDir."
+
+
+
+
+BaseDatabaseExecutor.java
+
+package com.example.lib;
+
+import com.example.lib.strategy.DeploymentCheck;
+import java.sql.Connection;
+import java.util.List;
+
+public abstract class BaseDatabaseExecutor<T extends BaseDatabaseExecutor<T>> {
+    protected Connection connection;
+
+    public BaseDatabaseExecutor(Connection connection) {
+        this.connection = connection;
+    }
+
+    public void executeMigration() {
+        preDeploymentChecks();
+        runMigration();
+        postDeploymentChecks();
+    }
+
+    protected abstract void preDeploymentChecks();
+
+    protected abstract void runMigration();
+
+    protected abstract void postDeploymentChecks();
+
+    public abstract void rollback();
+    
+    // Optional: Add hooks for custom checks that each executor can override
+    public void setCustomChecks(List<DeploymentCheck> preChecks, List<DeploymentCheck> postChecks) {}
+}
+
+
+
+DatabaseExecutorFactory.java
+
+package com.example.lib;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import java.sql.Connection;
+
+@ApplicationScoped
+public class DatabaseExecutorFactory {
+
+    @Inject
+    private Flyway flyway;
+
+    @Inject
+    private Liquibase liquibase;
+
+    public DatabaseMigrationTool getMigrationTool(String databaseType) {
+        switch (databaseType) {
+            case "oracle":
+                return new FlywayMigrationTool(flyway);
+            case "snowflake":
+                return new LiquibaseMigrationTool(liquibase);
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + databaseType);
+        }
+    }
+
+    public BaseDatabaseExecutor<?> getExecutor(String databaseType, Connection connection) {
+        switch (databaseType) {
+            case "oracle":
+                return new OracleExecutor(connection);  // Assume OracleExecutor extends BaseDatabaseExecutor
+            case "snowflake":
+                return new SnowflakeExecutor(connection);  // Assume SnowflakeExecutor extends BaseDatabaseExecutor
+            default:
+                throw new IllegalArgumentException("Unsupported database type: " + databaseType);
+        }
+    }
+}
+
+
+DatabaseMigrationService.java
+      
+package com.example.lib;
+
+import javax.enterprise.context.ApplicationScoped;
+import javax.inject.Inject;
+import java.util.List;
+
+@ApplicationScoped
+public class DatabaseMigrationService {
+
+    @Inject
+    private List<DeploymentCheck> preDeploymentChecks;
+
+    @Inject
+    private List<DeploymentCheck> postDeploymentChecks;
+
+    @Inject
+    private DatabaseMigrationTool databaseMigrationTool;
+
+    public void executeMigrationWithChecks(BaseDatabaseExecutor<?> executor) {
+        if (!runChecks(preDeploymentChecks)) {
+            throw new IllegalStateException("Pre-deployment checks failed. Migration aborted.");
+        }
+
+        try {
+            // Use the selected migration tool (Flyway or Liquibase)
+            databaseMigrationTool.migrate();
+            executor.executeMigration();
+
+            if (!runChecks(postDeploymentChecks)) {
+                executor.rollback();
+                throw new IllegalStateException("Post-deployment checks failed. Rolling back migration.");
+            }
+        } catch (Exception e) {
+            executor.rollback();
+            throw new RuntimeException("Migration failed: " + e.getMessage(), e);
+        }
+    }
+
+    private boolean runChecks(List<DeploymentCheck> checks) {
+        for (DeploymentCheck check : checks) {
+            if (!check.performCheck()) {
+                System.out.println("Check failed: " + check.getClass().getSimpleName());
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+      
+
+MigrationService.java
+
+package com.example.lib;
+
+import java.sql.Connection;
+
+public class MigrationService {
+    private final String dbType;
+    private final Connection connection;
+
+    public MigrationService(String dbType, Connection connection) {
+        this.dbType = dbType;
+        this.connection = connection;
+    }
+
+    public void runMigration() {
+        BaseDatabaseExecutor<?> executor = DatabaseExecutorFactory.getExecutor(dbType, connection);
+        try {
+            executor.executeMigration();
+            System.out.println("Migration completed successfully for database type: " + dbType);
+        } catch (Exception e) {
+            System.err.println("Migration failed: " + e.getMessage());
+            executor.rollback();
+        }
+    }
+}
+
+
+
+strategy/DeploymentCheck.java
+
+package com.example.lib.strategy;
+
+public interface DeploymentCheck {
+    boolean execute();
+}
+
+
+strategy/BackupCheck.java
+
+package com.example.lib.strategy;
+
+public class BackupCheck implements DeploymentCheck {
+    @Override
+    public boolean execute() {
+        // Logic to create a backup before migration
+        System.out.println("Performing backup check...");
+        return true;  // Return true if backup is successful
+    }
+}
+
+
+strategy/ValidationCheck.java
+
+package com.example.lib.strategy;
+
+public class ValidationCheck implements DeploymentCheck {
+    @Override
+    public boolean execute() {
+        // Logic to validate the deployment success
+        System.out.println("Performing validation check...");
+        return true;  // Return true if validation is successful
+    }
+}
+
+
+application.properties
+
+# application.properties for base-lib module
+
+# Database configurations (for demonstration, typically set via environment variables)
+database.url=jdbc:your_database_url
+database.username=your_username
+database.password=your_password
+database.driver=your_database_driver
+
+build.gradle
+
+plugins {
+    id 'java'
+}
+
+group = 'com.example.lib'
+version = '1.0-SNAPSHOT'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Database migration tools (either Flyway or Liquibase)
+    implementation 'org.flywaydb:flyway-core:9.5.1'
+    implementation 'org.liquibase:liquibase-core:4.15.0'
+
+    // Lombok for reducing boilerplate code
+    compileOnly 'org.projectlombok:lombok:1.18.24'
+    annotationProcessor 'org.projectlombok:lombok:1.18.24'
+
+    // JDBC Driver example (adjust for your database type)
+    implementation 'org.postgresql:postgresql:42.3.1'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += '-parameters'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+      
+DatabaseMigrationTool.java
+      
+package com.example.lib;
+
+public interface DatabaseMigrationTool {
+    void migrate();
+    void rollback();
+}
+
+
+FlywayMigrationTool.java
+
+package com.example.lib;
+
+import org.flywaydb.core.Flyway;
+
+public class FlywayMigrationTool implements DatabaseMigrationTool {
+
+    private final Flyway flyway;
+
+    public FlywayMigrationTool(Flyway flyway) {
+        this.flyway = flyway;
+    }
+
+    @Override
+    public void migrate() {
+        System.out.println("Executing Flyway migration...");
+        flyway.migrate();
+    }
+
+    @Override
+    public void rollback() {
+        System.out.println("Rolling back Flyway migration...");
+        flyway.undo();  // Flyway's undo feature (if available) or custom rollback logic
+    }
+}
+      
+LiquibaseMigrationTool.java
+
+      package com.example.lib;
+
+import liquibase.Liquibase;
+import liquibase.database.core.H2Database;
+import liquibase.resource.ClassLoaderResourceAccessor;
+
+public class LiquibaseMigrationTool implements DatabaseMigrationTool {
+
+    private final Liquibase liquibase;
+
+    public LiquibaseMigrationTool(Liquibase liquibase) {
+        this.liquibase = liquibase;
+    }
+
+    @Override
+    public void migrate() {
+        System.out.println("Executing Liquibase migration...");
+        try {
+            liquibase.update("");
+        } catch (Exception e) {
+            throw new RuntimeException("Liquibase migration failed", e);
+        }
+    }
+
+    @Override
+    public void rollback() {
+        System.out.println("Rolling back Liquibase migration...");
+        try {
+            liquibase.rollback(1, "");
+        } catch (Exception e) {
+            throw new RuntimeException("Liquibase rollback failed", e);
+        }
+    }
+}
+
+
+
+      MigrationController.java
+
+      package com.example.rest;
+
+import com.example.lib.DatabaseMigrationService;
+
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Response;
+
+@Path("/migration")
+public class MigrationController {
+
+    private final DatabaseMigrationService migrationService;
+
+    public MigrationController(DatabaseMigrationService migrationService) {
+        this.migrationService = migrationService;
+    }
+
+    @POST
+    @Path("/execute")
+    public Response executeMigration(@QueryParam("databaseType") String databaseType, Connection connection) {
+        try {
+            migrationService.executeMigrationWithChecks(databaseType, connection);
+            return Response.ok("Migration completed successfully").build();
+        } catch (Exception e) {
+            return Response.status(500).entity("Migration failed: " + e.getMessage()).build();
+        }
+    }
+}
+
+      
