@@ -1,74 +1,164 @@
-Performance Improvements: OpenShift and Tekton
-A comprehensive record of performance improvements in our OpenShift and Tekton environments. This document highlights key changes, their impacts, and metrics to track progress. It serves as a reference for stakeholders and supports ongoing optimization efforts.
-
-Table of Contents
-Introduction
-Summary of Improvements
-Detailed Improvement Sections
-PVC Cleanup
-Tekton Resolver
-Stale Namespace Cleanup
-Add More Improvements Here
-Metrics and Dashboards
-Before and After Comparison
-Future Roadmap
-1. Introduction
-Purpose: Provide visibility into performance improvements in our OpenShift and Tekton environments, helping stakeholders understand their value and track progress.
-Scope: Includes resource cleanup, architectural optimization, and operational changes.
-Audience: DevOps teams, platform engineers, and IT stakeholders.
-2. Summary of Improvements
-Improvement	Objective	Status	Impact Area	Date Introduced
-PVC Cleanup	Reclaim unused storage from temporary Tekton PVCs.	Completed	Storage, Build Time	Jan 10, 2025
-Tekton Resolver Usage	Dynamic resource resolution for Tekton pipelines.	Completed	Build Optimization	Feb 5, 2025
-Namespace Cleanup	Remove stale namespaces to improve etcd health.	Completed	Cluster Performance	Dec 20, 2024
-Dedicated PVC Pre-allocation	Avoid runtime PVC delays during Tekton builds.	In Progress	Build Time, Storage	Target: Mar 2025
-Tekton Pruner Addition	Automate cleanup of Tekton task and pipeline runs.	In Progress	Resource Cleanup	Target: Apr 2025
-Replace ConfigMaps with Params	Simplify Tekton param injection.	Planned	Configuration, CI/CD	Target: May 2025
 3. Detailed Improvement Sections
-3.1. PVC Cleanup
-Problem: Unused PVCs from Tekton builds accumulated, wasting storage and affecting cluster efficiency.
-Solution: Automated PVC cleanup policies implemented in the Tekton namespace.
+3.5. Cache Build Dependencies and Docker Container Image Building Layers
+Problem: Build times were slow due to repeated downloading and rebuilding of dependencies in Tekton pipelines, as well as inefficient Docker image layer caching during the build process.
+Solution:
+Implemented caching mechanisms for dependencies in Tekton pipelines to avoid re-fetching them on each run.
+Optimized Docker image builds by leveraging multi-stage builds and caching image layers to speed up the process.
 Impact:
-Reduced storage usage by X%.
-Improved build time by reducing storage contention.
-Timeline: Deployed to production on Jan 10, 2025.
-3.2. Tekton Resolver
-Problem: Static resource definitions in Tekton pipelines limited flexibility and scalability.
-Solution: Introduced Tekton Resolver for dynamic resource resolution.
-Impact:
-Streamlined pipeline configurations.
-Reduced manual effort and improved execution times.
-Timeline: Deployed to production on Feb 5, 2025.
-3.3. Stale Namespace Cleanup
-Problem: Stale namespaces consumed etcd resources, degrading cluster performance and causing higher latency.
-Solution: Implemented periodic scripts to identify and clean up stale namespaces.
-Impact:
-Reduced etcd latency by X%.
-Improved cluster stability.
-Timeline: Completed on Dec 20, 2024.
-3.4. Add More Improvements Here
-Follow the format above for new improvements.
+Reduced pipeline build time by X% due to minimized dependency retrieval and layer rebuild.
+Improved resource utilization by reducing redundant operations, lowering network and disk I/O.
+Timeline: Target implementation date Mar 28, 2025.
+
+
 4. Metrics and Dashboards
 Metric	Description	Monitoring Tool	Dashboard Link	Date Range
-Storage Usage (PVCs)	Measure PVC usage trends in the Tekton namespace.	Prometheus/Grafana	PVC Storage Dashboard	Dec 2024 – Feb 2025
-Build Performance	Average pipeline build and queue times.	Kibana/Tekton Logs	Build Metrics	Jan 2025 – Present
-Namespace Resource Count	Active and stale namespace statistics.	Prometheus/Splunk	Namespace Dashboard	Nov 2024 – Dec 2024
-Cluster Resource Utilization	Node-level CPU and memory usage.	Prometheus/Grafana	Cluster Resources	Dec 2024 – Present
-etcd Latency	Measure etcd request latency improvements.	Prometheus/Grafana	etcd Metrics	Dec 2024 – Jan 2025
+Build Dependency Cache Hit Rate	Percentage of builds using cached dependencies.	Prometheus/Grafana	Dependency Cache Metrics	Post Mar 2025
+Docker Layer Cache Efficiency	Measure of reused Docker image layers during builds.	Prometheus/Grafana	Docker Build Cache Dashboard	Post Mar 2025
+Pipeline Build Time Reduction	Average pipeline execution time improvement.	Kibana/Tekton Logs	Build Time Dashboard	Post Mar 2025
+
 5. Before and After Comparison
 Improvement	Before (Date)	After (Date)
-PVC Cleanup	X GB storage usage (Dec 2024)	Y GB storage usage (Feb 2025, Z% reduction).
-Tekton Resolver	Static resource definitions in pipelines.	Dynamic resource resolution (Feb 2025).
-Stale Namespace Cleanup	High etcd latency (Nov 2024).	Reduced etcd latency by X% (Dec 2024).
-6. Future Roadmap
-Expand automated cleanup mechanisms to other namespaces.
-Pre-allocate dedicated PVCs for resource consistency in Tekton builds.
-Optimize parameter injection by replacing ConfigMaps with inline values.
-Automate pipeline pruning via Tekton Pruner for long-term cleanup.
-Evaluate the feasibility of predictive scaling for cluster resources.
-Suggestions for Enhancements
-Visual Elements: Incorporate charts or graphs showing performance trends.
-Interactivity: Embed live dashboards and allow stakeholders to explore metrics directly.
-Feedback Loop: Include a feedback form for stakeholders to suggest improvements or highlight new areas of focus.
-Regular Updates: Add a "Latest Updates" section at the top of the document to spotlight recent changes.
-Would you like further customization or a version formatted specifically for Confluence?
+Cache Build Dependencies and Docker Layers	Build time: X minutes (Feb 2025).	Build time: Y minutes (Mar 2025, Z% reduction).
+
+
+3. Detailed Improvement Sections
+3.6. Persistent Volume for Build Dependency Caching
+Problem: Maven, Gradle, and npm caches were destroyed between pipeline runs due to new workspace volume provisioning for each Tekton pipeline run, leading to repeated dependency downloads and slower builds.
+Solution: Provisioned a persistent volume (PV) that can be mounted by task pods during builds. This PV is reused across subsequent pipeline runs, allowing cached dependencies and build results to persist.
+Impact:
+Reduced pipeline build time by X%.
+Improved resource efficiency by minimizing redundant network and disk I/O.
+Timeline: Completed on Oct 29, 2024.
+4. Metrics and Dashboards
+Metric	Description	Monitoring Tool	Dashboard Link	Date Range
+Persistent Cache Hit Rate	Percentage of builds utilizing cached dependencies from the persistent volume.	Prometheus/Grafana	Persistent Cache Metrics	Post Oct 2024
+Pipeline Build Time Reduction	Average reduction in build time due to caching.	Kibana/Tekton Logs	Pipeline Build Metrics	Post Oct 2024
+Persistent Volume Utilization	Utilization rate of the persistent volume allocated for caching.	Prometheus/Grafana	PV Utilization Dashboard	Post Oct 2024
+5. Before and After Comparison
+Improvement	Before (Date)	After (Date)
+Persistent Volume for Build Caching	Build time: X minutes (Sep 2024).	Build time: Y minutes (Oct 2024, Z% reduction).
+
+3. Detailed Improvement Sections
+3.7. Tekton Pruner for Automated PipelineRun Cleanup
+Problem: Each OpenShift namespace ran a dedicated cron job every 10 minutes to delete the last 10 PipelineRuns, leading to inefficiencies and contributing to etcd performance degradation due to the overwhelming number of PipelineRuns across multiple namespaces.
+Solution: Implemented Tekton Pruner to automate the cleanup of PipelineRuns and their associated objects immediately after pipeline completion. This eliminated the need for dedicated housekeeping cron jobs and reduced the etcd load.
+Impact:
+Reduced etcd resource consumption, leading to improved cluster performance.
+Lowered administrative overhead by automating cleanup tasks.
+Improved stability of pipeline execution by reducing namespace clutter.
+Timeline: Completed on Dec 24, 2024.
+4. Metrics and Dashboards
+Metric	Description	Monitoring Tool	Dashboard Link	Date Range
+PipelineRun Cleanup Efficiency	Number of PipelineRuns and associated objects deleted per time unit.	Prometheus/Grafana	Tekton Pruner Metrics	Post Dec 2024
+etcd Resource Utilization	CPU, memory, and I/O metrics related to etcd performance.	Prometheus/Grafana	etcd Performance Dashboard	Post Dec 2024
+Cluster Resource Savings	Reduction in CPU/memory usage due to cron job elimination.	Prometheus/Grafana	Cluster Resource Metrics	Post Dec 2024
+5. Before and After Comparison
+Improvement	Before (Date)	After (Date)
+Tekton Pruner for Automated Cleanup	Cron jobs running every 10 minutes, high etcd load (Nov 2024).	Automated cleanup with Tekton Pruner, reduced etcd load (Dec 2024).
+
+3. Detailed Improvement Sections
+3.8. Replacing ConfigMaps with ABC Service for Reserved Parameters
+Problem:
+
+In the Tekton namespace on OpenShift, static values like URLs for external services were stored in ConfigMaps and cloned to several user namespaces to support build needs.
+This approach contributed to significant etcd size growth (>5GB), exceeding Red Hat's recommended size, and resulted in high cluster load.
+The build cluster became too busy, often requiring offboarding namespaces to other clusters to maintain stability.
+Solution:
+
+Introduced an ABC service to dynamically construct PipelineRuns for each namespace using reserved parameters.
+The reserved parameters were passed directly to Tekton tasks, removing the need for ConfigMaps and their associated duplication across namespaces.
+Impact:
+
+Reduced etcd size significantly by eliminating unnecessary ConfigMaps and their clones.
+Improved cluster performance by reducing etcd resource usage and simplifying namespace management.
+Decreased administrative overhead related to namespace offboarding.
+Timeline: Completed on Nov 28, 2024.
+
+4. Metrics and Dashboards
+Metric	Description	Monitoring Tool	Dashboard Link	Date Range
+etcd Size Reduction	Total size of etcd before and after ConfigMap removal.	Prometheus/Grafana	etcd Size Metrics	Post Nov 2024
+Namespace Resource Efficiency	Performance improvements in namespaces after ConfigMap removal.	Prometheus/Grafana	Namespace Metrics Dashboard	Post Nov 2024
+Build Cluster Utilization	Reduction in resource load on the build cluster.	Prometheus/Grafana	Cluster Resource Metrics	Post Nov 2024
+5. Before and After Comparison
+Improvement	Before (Date)	After (Date)
+Replacing ConfigMaps with ABC Service	etcd size > 5GB, high cluster load (Oct 2024).	etcd size < XGB, improved cluster performance (Nov 2024).
+
+
+3. Detailed Improvement Sections
+3.9. PVC Pooling in Tekton Tasks/Pods
+Problem:
+
+Kubernetes PVC allocation is a time-consuming process that delays pod startup during Tekton task execution.
+Each Tekton task requires its own PVC allocation, which leads to inefficiencies and increased build times.
+Solution:
+
+Implemented a pool of pre-allocated PVCs that Tekton tasks and pods can use.
+This approach ensures that pods are ready faster as they do not need to wait for PVC allocation during runtime.
+Impact:
+
+Reduced pod startup times, leading to faster pipeline execution.
+Improved resource efficiency by reducing PVC provisioning delays.
+Enabled smoother execution of high-frequency Tekton workloads.
+Timeline: Completed on Apr 30, 2024.
+
+4. Metrics and Dashboards
+Metric	Description	Monitoring Tool	Dashboard Link	Date Range
+Pod Startup Time Reduction	Average time taken for pods to become ready.	Prometheus/Grafana	Pod Startup Metrics	Post Apr 2024
+PVC Allocation Efficiency	Time saved by using pre-allocated PVCs.	Prometheus/Grafana	PVC Pooling Dashboard	Post Apr 2024
+Pipeline Execution Time	Average reduction in pipeline execution times.	Kibana/Tekton Logs	Pipeline Metrics Dashboard	Post Apr 2024
+5. Before and After Comparison
+Improvement	Before (Date)	After (Date)
+PVC Pooling for Tekton Tasks/Pods	Pod startup delay due to PVC allocation (Mar 2024).	Faster pod startup with pre-allocated PVCs (Apr 2024).
+
+3. Detailed Improvement Sections
+3.10. Using ABCD Proxy Artifactory Edge Node API
+Problem:
+
+Tekton tasks currently access Artifactory packages directly, leading to repeated downloads and slower pipeline execution.
+This approach lacks caching capabilities, resulting in higher network latency and unnecessary resource usage for frequently accessed packages.
+Solution:
+
+Implemented the new Artifactory Edge Node API (ABCD Proxy) with inbuilt caching.
+Tekton tasks now access Artifactory through the edge node, benefiting from improved caching and reduced latency.
+Impact:
+
+Reduced pipeline execution times by minimizing package fetch latency.
+Optimized network usage with caching for frequently accessed packages.
+Improved resource utilization across Tekton pipelines.
+Timeline: Completed on Mar 19, 2024.
+
+4. Metrics and Dashboards
+Metric	Description	Monitoring Tool	Dashboard Link	Date Range
+Package Fetch Time	Average time taken to fetch packages in Tekton pipelines.	Prometheus/Grafana	Artifactory Proxy Metrics	Post Mar 2024
+Network Bandwidth Usage	Reduction in network load due to caching.	Prometheus/Grafana	Network Metrics Dashboard	Post Mar 2024
+Pipeline Execution Time	Average reduction in Tekton pipeline execution times.	Kibana/Tekton Logs	Pipeline Metrics Dashboard	Post Mar 2024
+5. Before and After Comparison
+Improvement	Before (Date)	After (Date)
+Using ABCD Proxy Artifactory Edge Node	Direct access to Artifactory, higher latency (Feb 2024).	Cached access via Edge Node API, reduced latency (Mar 2024).
+
+3. Detailed Improvement Sections
+3.11. Using Load Balancers Before ABC Microservice Routes
+Problem:
+
+Microservices hosted in the OpenShift cluster are directly accessed via Kubernetes route URLs.
+This direct access lacks caching and advanced routing features, leading to higher latency and less efficient usage during Tekton pipeline runs, which heavily utilize these services.
+Solution:
+
+Introduced Load Balancers in front of microservice routes.
+The load balancer URLs provide caching, efficient routing, and failover capabilities, improving performance and reliability for Tekton pipelines.
+Impact:
+
+Reduced latency for microservice calls, enhancing Tekton pipeline execution.
+Improved fault tolerance and scalability of microservices.
+Reduced the load on Kubernetes routes and cluster resources.
+Timeline: Completed on Sep 17, 2024.
+
+4. Metrics and Dashboards
+Metric	Description	Monitoring Tool	Dashboard Link	Date Range
+Microservice Response Time	Average response time of microservices.	Prometheus/Grafana	Microservice Metrics Dashboard	Post Sep 2024
+Load Balancer Utilization	Monitoring the performance and load handled by the load balancers.	Prometheus/Grafana	Load Balancer Metrics	Post Sep 2024
+Pipeline Execution Time	Reduction in Tekton pipeline execution times due to faster microservice responses.	Kibana/Tekton Logs	Pipeline Metrics Dashboard	Post Sep 2024
+5. Before and After Comparison
+Improvement	Before (Date)	After (Date)
+Load Balancers Before Microservice Routes	Direct access via Kubernetes routes, higher latency (Aug 2024).	Cached and efficient routing via load balancers, reduced latency (Sep 2024).
+
