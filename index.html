@@ -1,58 +1,153 @@
-Leadership & Strategy
-Meetings & Action Items
-Weekly Leadership Meetings
-Quarterly Reviews
-Strategic Goals & KPIs
-Business and Engineering Goals
-Fintech Industry Trends
-Engineering Projects
-Current Projects
-Project A (Link to design, architecture, and ongoing tasks)
-Project B (Link to documentation and deliverables)
-Completed Projects
-Completed Q3 Projects
-Retrospective Notes
-Technical Knowledge
-Architecture & Design
-System Architecture Diagrams
-Design Decisions
-Tech Stack
-Quarkus Overview
-Harness Pipeline Configurations
-Team Development
-1:1 Notes
-John Doe (Link to feedback and goals)
-Jane Smith (Link to progress and action items)
-Team Feedback
-Sprint Retrospective Notes
+Technical Design Document: Email Notification Service with Template Processing
+1. Overview
+This document outlines the design for an email notification service that processes a list of user emails and sends notifications based on a provided .tpl template file. The service will be scalable and operate within a Kubernetes/Openshift environment. The system will leverage Kafka for messaging and S3 for template storage. MongoDB will be used for tracking the status of email notifications and user metadata.
 
+2. Key Components
+Swagger API:
 
-Leadership & Strategy
-Meetings and Action Items
-Leadership Development
-Strategic Goals and KPIs
-Engineering Projects
-Current Projects
-Completed Projects
-Pipeline and Deployment
-Technical Debt & Improvements
-Team Development
-1:1 Notes with Team
-Team Feedback & Reviews
-Mentorship & Coaching
-Technical Knowledge & Documentation
-Architecture & Design Docs
-Coding Standards & Best Practices
-Tools & Frameworks (e.g., Harness, Flyway, Quarkus)
-Tech Stack Overview
-Process & Methodologies
-Agile/Scrum Processes
-CI/CD Pipeline (e.g., Tekton, Harness)
-Quality & Testing (e.g., Prometheus, Grafana)
-Personal Development & Training
-Trainings/Certifications (e.g., Quarkus, Node.js, .NET)
-Knowledge Gaps & Future Learning
-Miscellaneous
-Notes on Industry Trends
-Research and Articles
-Personal Notes (if applicable)
+Accepts a requestId, application name, and the path to an Outlook .tpl file.
+Validates the provided id and application against the database to retrieve associated user emails.
+Sends a message to Kafka with the requestId, application name, and list of user emails.
+Kafka Consumer:
+
+Retrieves email information from Kafka and processes each email in parallel, using a provided template.
+Updates the email send status in MongoDB.
+S3 Bucket:
+
+Stores .tpl files used for email notifications.
+MongoDB:
+
+Stores the status of email notifications, including whether they were successfully sent or failed.
+Maintains metadata related to each email notification request, including the list of users and status.
+3. Workflow
+3.1 High-Level Workflow:
+Swagger API Endpoint:
+Triggered by a support user who provides a requestId and application name.
+The API validates the provided inputs and fetches the list of associated user emails.
+The API retrieves the .tpl template file URL from S3 and constructs a payload containing the requestId, application, user emails, and template URL.
+The payload is sent to Kafka for processing.
+Kafka Consumer:
+Consumes messages from the Kafka topic and processes the email notifications in parallel.
+For each user in the email list, the Kafka consumer:
+Downloads the .tpl template file from S3.
+Populates the template with the requestId and application name.
+Sends the email to the user via an SMTP service.
+Updates the email status in MongoDB (Sent, Failed).
+MongoDB:
+Stores a document in the email_requests collection with metadata about the email notification request.
+Stores individual email statuses in the email_status collection, including requestId, email, status, and sentAt timestamp.
+3.2 Detailed Workflow:
+User Trigger:
+
+Support users provide the requestId, application name, and .tpl file through the Swagger API endpoint.
+The API validates the request and retrieves the associated list of emails from the database.
+Template Retrieval:
+
+The API retrieves the .tpl template file from the S3 bucket.
+The template URL is added to the payload sent to Kafka.
+Kafka Messaging:
+
+The API sends a Kafka message with the following structure:
+json
+Copy
+Edit
+{
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "application": "Payroll",
+  "users": [
+    { "email": "user1@example.com" },
+    { "email": "user2@example.com" }
+  ],
+  "tplFileUrl": "https://your-bucket-name.s3.amazonaws.com/notification.tpl"
+}
+Email Processing (Kafka Consumer):
+
+The Kafka consumer receives the payload, retrieves the .tpl file from S3, and sends the email to each user in the users array.
+The status of each email is logged in MongoDB in the email_status collection, including the requestId, email, status, and sentAt timestamp.
+Example email status document:
+
+json
+Copy
+Edit
+{
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "users": [
+    {
+      "_id": "ObjectId('...')",
+      "email": "user@example.com",
+      "status": "Sent",
+      "sentAt": "2025-02-05T13:00:00Z"
+    }
+  ]
+}
+4. Database Design
+4.1 MongoDB Collections:
+email_requests Collection: Stores metadata for each email notification request.
+
+Example document:
+
+json
+Copy
+Edit
+{
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "application": "Payroll",
+  "users": [
+    { "email": "user1@example.com" },
+    { "email": "user2@example.com" }
+  ],
+  "status": "Pending",
+  "createdAt": "2025-02-05T12:34:56Z"
+}
+email_status Collection: Stores the status of each email sent within a request.
+
+Example document:
+
+json
+Copy
+Edit
+{
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "users": [
+    {
+      "_id": "ObjectId('...')",
+      "email": "user@example.com",
+      "status": "Sent",
+      "sentAt": "2025-02-05T13:00:00Z"
+    }
+  ]
+}
+5. Email Template Storage
+S3 Bucket: All .tpl files will be stored in an S3 bucket for easy access by the Kafka consumer during email processing.
+URL to template will be passed in the Kafka message.
+The template should be stored with proper naming conventions to ensure it is easily accessible.
+6. Scalability and Performance Considerations
+Kafka Batching:
+
+Kafka consumers will process emails in batches to ensure that the system can handle large volumes of emails efficiently.
+Messages can be split across multiple partitions in Kafka to ensure parallel processing.
+Parallel Email Processing:
+
+The Kafka consumer will process user emails in parallel to optimize for speed. Batch size can be adjusted based on system capacity.
+Multiple Kafka consumers can run in parallel, horizontally scaling the system.
+MongoDB Indexing:
+
+To improve performance, we will index the requestId and email fields in MongoDB to quickly retrieve email status updates.
+Retry Logic:
+
+If an email fails to send, retry logic will be implemented within the Kafka consumer. Failed emails will be logged, and the status will be updated to Failed in MongoDB.
+7. Security Considerations
+OAuth Authentication:
+
+Ensure that only authorized users can trigger the Swagger API endpoint. OAuth authentication will be used to secure the API.
+Data Encryption:
+
+Both the .tpl files in S3 and email data should be encrypted at rest and during transit.
+Access Control:
+
+Access to the email status documents in MongoDB will be restricted based on user roles.
+8. Retry Mechanism
+If an email fails to send, the system will attempt to retry sending the email up to a defined maximum number of attempts. Failed email statuses will be logged in MongoDB for audit and troubleshooting purposes.
+
+9. Conclusion
+This design provides a scalable, secure, and efficient solution for sending bulk email notifications. By leveraging Kafka, S3, and MongoDB, we ensure high availability, fault tolerance, and easy tracking of email send statuses. The architecture is built to handle large volumes of email requests and will be able to scale horizontally to accommodate increasing loads.
