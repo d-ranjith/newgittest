@@ -1,198 +1,45 @@
-Updated Design Document: Email Notification System with Kafka Integration
-1. Overview
-This system will allow support users to trigger email notifications based on corpId and application names. The primary responsibility of the /email-notification endpoint is to persist data in the database and send it to a Kafka topic. The actual email notifications are then processed asynchronously by a Kafka consumer that reads the template URL and email list from the Kafka message to send out the emails. The email status is tracked in MongoDB, and users can check the status of email notifications or retry failures.
+Database Schema Design (MongoDB)
+To support template storage, email tracking, and status updates, we will use two collections:
 
-2. API Endpoints
-POST /api/email-notification
-This API endpoint accepts a batch of corpId and application pairs, generates a unique requestId, and triggers Kafka messages. It only persists the data in the database and pushes it to Kafka for actual processing.
-
-Request Example
-json
-Copy
-Edit
-[
-  {
-    "corpId": "1234",
-    "application": "Payroll"
-  },
-  {
-    "corpId": "4567",
-    "application": "HR"
-  }
-]
-Response Example
-json
-Copy
-Edit
-[
-  {
-    "requestId": "123e4567-e89b-12d3-a456-426614174000",
-    "corpId": "1234",
-    "application": "Payroll",
-    "tplFileUrl": "https://your-bucket-name.s3.amazonaws.com/notification.tpl",
-    "users": [
-      { "email": "user1@example.com" },
-      { "email": "user2@example.com" }
-    ],
-    "status": "success",
-    "message": "Email notification process triggered successfully."
-  },
-  {
-    "requestId": "123e4567-e89b-12d3-a456-426614174000",
-    "corpId": "4567",
-    "application": "HR",
-    "tplFileUrl": "https://your-bucket-name.s3.amazonaws.com/notification.tpl",
-    "users": [
-      { "email": "user1@example.com" },
-      { "email": "user2@example.com" }
-    ],
-    "status": "success",
-    "message": "Email notification process triggered successfully."
-  }
-]
-POST /api/email-notification/trigger-kafka
-This endpoint triggers the Kafka consumer to start processing the email notifications. It can be invoked manually after the initial batch is persisted in the database and sent to Kafka.
-
-Request Example
-json
-Copy
-Edit
-{
-  "requestId": "123e4567-e89b-12d3-a456-426614174000"
-}
-Response Example
-json
-Copy
-Edit
-{
-  "status": "success",
-  "message": "Email notifications triggered for processing through Kafka.",
-  "requestId": "123e4567-e89b-12d3-a456-426614174000"
-}
-Possible Errors
-400 Bad Request: Invalid requestId provided.
-404 Not Found: No records found for the given requestId.
-500 Internal Server Error: Error in triggering Kafka consumer.
-GET /email-notifications/{requestId}/status
-This endpoint allows users to check the status of the email notifications for a given requestId.
-
-Request Parameters
-requestId: The unique identifier for the email notification request.
-Response Example
-json
-Copy
-Edit
-{
-  "requestId": "123e4567-e89b-12d3-a456-426614174000",
-  "status": "Completed",
-  "users": [
-    {
-      "email": "user1@example.com",
-      "status": "Sent",
-      "sentAt": "2025-02-05T13:00:00Z"
-    },
-    {
-      "email": "user2@example.com",
-      "status": "Failed",
-      "sentAt": "2025-02-05T13:02:00Z"
-    }
-  ]
-}
-Possible Errors
-400 Bad Request: Invalid requestId.
-404 Not Found: No records found for the given requestId.
-500 Internal Server Error: General error in fetching email statuses.
-POST /email-notifications/{requestId}/retry
-This endpoint allows support users to retry sending emails for a specific requestId where the status is "Failed."
-
-Request Parameters
-requestId: The unique identifier for the email notification request.
-Response Example
-json
-Copy
-Edit
-{
-  "status": "success",
-  "message": "Email notification retry triggered successfully.",
-  "requestId": "123e4567-e89b-12d3-a456-426614174000"
-}
-Possible Errors
-400 Bad Request: Invalid requestId.
-404 Not Found: No failed email notifications found for the given requestId.
-500 Internal Server Error: General error in retry processing.
-GET /email-notifications/template
-This endpoint retrieves metadata about a specific template stored in the S3 bucket.
-
-Request Parameters
-tplFileUrl: URL pointing to the .tpl file stored in S3.
-Response Example
-json
-Copy
-Edit
-{
-  "tplFileUrl": "https://your-bucket-name.s3.amazonaws.com/notification.tpl",
-  "templateSize": "3KB",
-  "lastModified": "2025-02-05T12:00:00Z"
-}
-Possible Errors
-400 Bad Request: Invalid tplFileUrl.
-404 Not Found: Template not found at the specified URL.
-500 Internal Server Error: Error in fetching template metadata.
-3. Workflow and Technical Design
-3.1 API Flow
-Support User Request:
-
-The support user submits a list of corpId and application pairs to the /api/email-notification endpoint.
-Each request triggers the generation of a unique requestId.
-The details, including corpId, application, email list, and template file URL, are saved to MongoDB and sent to Kafka.
-Trigger Kafka Consumer:
-
-Once the data is in Kafka, the /api/email-notification/trigger-kafka endpoint is used to initiate the Kafka consumer service.
-This service processes the messages, sends emails using the template from S3, and updates the email status in MongoDB.
-Status Tracking and Retry:
-
-After processing, users can use the /email-notifications/{requestId}/status endpoint to check the status of the emails.
-If any emails fail, the support user can trigger a retry through the /email-notifications/{requestId}/retry endpoint.
-3.2 Kafka Consumer Workflow
-Consume Kafka Message:
-
-The Kafka consumer listens for messages from Kafka, processes them, and applies the template URL to send emails.
-Email Sending:
-
-Emails are sent to users, and the status is updated for each email in MongoDB.
-Email Status Updates:
-
-The MongoDB collection is updated with the status of each email ("Sent", "Failed", etc.), and the timestamp of when the email was sent.
-4. Data Storage Design
-4.1 MongoDB Collection for Email Status
-MongoDB will store the status of emails for auditing and tracking. The schema will look like this:
-
+email_requests (Tracks each request from support users)
+email_status (Stores individual email statuses)
+1. email_requests Collection (Stores Template and Metadata)
+Stores details of each batch request received from the API.
+Includes id, application, tpl file, and status.
+Allows request tracing by requestId.
 json
 Copy
 Edit
 {
   "_id": "ObjectId('...')",
-  "email": "user@example.com",
-  "status": "Sent",
   "requestId": "123e4567-e89b-12d3-a456-426614174000",
-  "sentAt": "2025-02-05T13:00:00Z"
+  "id": "12345",
+  "application": "AppX",
+  "tplFile": "notification.tpl",
+  "createdAt": "2025-02-05T12:34:56Z",
+  "status": "Processing", // Pending, Success, Failed
+  "userCount": 2000
 }
-4.2 S3 Bucket for Template Storage
-Template files (.tpl) are stored in an S3 bucket and accessed by the Kafka consumer to apply them when sending emails.
-5. Scalability Considerations
-Batch Processing:
+📌 Indexes:
 
-The API handles large volumes of requests (up to 2000 corpId/application pairs) efficiently by persisting them in the database and sending them to Kafka.
-Asynchronous Email Sending:
+{ requestId: 1 } ✅ (For tracking requests)
+{ id: 1, application: 1 } ✅ (For validation lookup)
+2. email_status Collection (Stores Each Email Status)
+Stores each email record processed from Kafka.
+Allows tracking success/failure with timestamps and retries.
+json
+Copy
+Edit
+{
+  "_id": "ObjectId('...')",
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "email": "user@example.com",
+  "status": "Pending", // Success, Failed, Retrying
+  "attempts": 1,
+  "lastAttempt": "2025-02-05T12:35:10Z",
+  "errorMessage": null
+}
+📌 Indexes:
 
-The Kafka consumer service processes email sending asynchronously, allowing for high throughput and scalability.
-API Rate Limiting:
-
-The API should implement rate limiting to avoid abuse and ensure that only authorized users can trigger the process.
-6. Authentication & Authorization
-API Authentication: The /api/email-notification and /api/email-notification/trigger-kafka endpoints should be protected using OAuth2 or JWT-based token authentication to ensure that only authorized users (e.g., support staff) can trigger email notifications.
-7. Error Handling
-400 Bad Request: Invalid inputs, such as malformed emails or invalid requestId.
-404 Not Found: No records found for the given requestId.
-500 Internal Server Error: General errors, such as issues with Kafka or database updates.
-This updated design document now includes the additional API to trigger Kafka consumption and ensures that the email notifications are only processed after the Kafka consumer reads the messages.
+{ requestId: 1, email: 1 } ✅ (For fast lookups)
+{ status: 1 } ✅ (For failure retries)
