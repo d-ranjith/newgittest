@@ -151,3 +151,299 @@ If an email fails to send, the system will attempt to retry sending the email up
 
 9. Conclusion
 This design provides a scalable, secure, and efficient solution for sending bulk email notifications. By leveraging Kafka, S3, and MongoDB, we ensure high availability, fault tolerance, and easy tracking of email send statuses. The architecture is built to handle large volumes of email requests and will be able to scale horizontally to accommodate increasing loads.
+
+
+1. API Endpoints
+1.1. Trigger Email Notification
+Endpoint: POST /email-notifications
+
+This endpoint is used to trigger the email notification process by sending a requestId and application name, along with the .tpl file URL from S3. It will validate the user data and enqueue the request for processing.
+
+Request Body:
+
+json
+Copy
+Edit
+{
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "application": "Payroll",
+  "tplFileUrl": "https://your-bucket-name.s3.amazonaws.com/notification.tpl",
+  "users": [
+    { "email": "user1@example.com" },
+    { "email": "user2@example.com" }
+  ]
+}
+Response:
+
+json
+Copy
+Edit
+{
+  "status": "success",
+  "message": "Email notification process triggered successfully.",
+  "requestId": "123e4567-e89b-12d3-a456-426614174000"
+}
+Possible Errors:
+
+400 Bad Request: Invalid requestId or application name, or invalid email addresses.
+401 Unauthorized: User does not have proper authorization to trigger the request.
+500 Internal Server Error: General error in the API processing.
+1.2. Get Email Status
+Endpoint: GET /email-notifications/{requestId}/status
+
+This endpoint allows users to check the status of the email notifications for a given requestId. It returns the status of each individual email in the list.
+
+Request Parameters:
+
+requestId: The unique identifier for the email notification request.
+Response:
+
+json
+Copy
+Edit
+{
+  "requestId": "123e4567-e89b-12d3-a456-426614174000",
+  "status": "Completed",
+  "users": [
+    {
+      "email": "user1@example.com",
+      "status": "Sent",
+      "sentAt": "2025-02-05T13:00:00Z"
+    },
+    {
+      "email": "user2@example.com",
+      "status": "Failed",
+      "sentAt": "2025-02-05T13:02:00Z"
+    }
+  ]
+}
+Possible Errors:
+
+400 Bad Request: Invalid requestId.
+404 Not Found: No records found for the given requestId.
+500 Internal Server Error: General error in fetching email statuses.
+1.3. Get Template File Information
+Endpoint: GET /email-notifications/template
+
+This endpoint retrieves information about a specific template stored in the S3 bucket.
+
+Request Parameters:
+
+tplFileUrl: URL pointing to the .tpl file stored in S3.
+Response:
+
+json
+Copy
+Edit
+{
+  "tplFileUrl": "https://your-bucket-name.s3.amazonaws.com/notification.tpl",
+  "templateSize": "3KB",
+  "lastModified": "2025-02-05T12:00:00Z"
+}
+Possible Errors:
+
+400 Bad Request: Invalid tplFileUrl.
+404 Not Found: Template not found at the specified URL.
+500 Internal Server Error: Error in fetching template metadata.
+1.4. Retry Email Notifications
+Endpoint: POST /email-notifications/{requestId}/retry
+
+This endpoint allows support users to retry sending emails for a specific requestId where the status is Failed.
+
+Request Parameters:
+
+requestId: The unique identifier for the email notification request.
+Response:
+
+json
+Copy
+Edit
+{
+  "status": "success",
+  "message": "Email notification retry triggered successfully.",
+  "requestId": "123e4567-e89b-12d3-a456-426614174000"
+}
+Possible Errors:
+
+400 Bad Request: Invalid requestId.
+404 Not Found: No failed email notifications found for the given requestId.
+500 Internal Server Error: General error in retry processing.
+2. Authentication and Authorization
+All endpoints will require OAuth authentication with the following roles:
+
+Admin/Support User: Can trigger email notifications and view email statuses.
+Authenticated User: Can only view email statuses, not trigger emails.
+The API will validate the Authorization header for every request.
+
+3. Additional Considerations
+Rate Limiting:
+Apply rate limiting to the POST /email-notifications and POST /email-notifications/{requestId}/retry endpoints to prevent abuse or excessive requests.
+Pagination:
+For large numbers of email statuses, pagination may be used in the GET /email-notifications/{requestId}/status response.
+Swagger API Specification Example
+yaml
+Copy
+Edit
+openapi: 3.0.0
+info:
+  title: Email Notification Service API
+  description: API to trigger and track email notifications using templates.
+  version: 1.0.0
+paths:
+  /email-notifications:
+    post:
+      summary: Trigger email notification process
+      requestBody:
+        description: Request body to trigger email notifications
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId:
+                  type: string
+                application:
+                  type: string
+                tplFileUrl:
+                  type: string
+                users:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      email:
+                        type: string
+      responses:
+        '200':
+          description: Email notification process triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  requestId:
+                    type: string
+        '400':
+          description: Invalid input or bad request
+        '500':
+          description: Internal server error
+  /email-notifications/{requestId}/status:
+    get:
+      summary: Get the status of email notifications for a specific requestId
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Status of email notifications
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  requestId:
+                    type: string
+                  status:
+                    type: string
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        email:
+                          type: string
+                        status:
+                          type: string
+                        sentAt:
+                          type: string
+                          format: date-time
+        '400':
+          description: Invalid requestId
+        '404':
+          description: No records found
+        '500':
+          description: Internal server error
+  /email-notifications/template:
+    get:
+      summary: Get template file information
+      parameters:
+        - in: query
+          name: tplFileUrl
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Template file metadata
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tplFileUrl:
+                    type: string
+                  templateSize:
+                    type: string
+                  lastModified:
+                    type: string
+                    format: date-time
+        '400':
+          description: Invalid tplFileUrl
+        '404':
+          description: Template not found
+        '500':
+          description: Internal server error
+  /email-notifications/{requestId}/retry:
+    post:
+      summary: Retry email notifications for a specific requestId
+      parameters:
+        - in: path
+          name: requestId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Retry triggered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  message:
+                    type: string
+                  requestId:
+                    type: string
+        '400':
+          description: Invalid requestId
+        '404':
+          description: No failed notifications found for the requestId
+        '500':
+          description: Internal server error
+This design and API specification will provide a comprehensive, scalable, and secure way to trigger and track email notifications, leveraging S3 for template storage, Kafka for messaging, and MongoDB for status tracking.
+
+
+
+
+
+
+
+
+
+
+
+Search
+
+Reason
+
+ChatGPT can make mistakes. Check importan
