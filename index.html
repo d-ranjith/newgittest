@@ -1,45 +1,295 @@
-Database Schema Design (MongoDB)
-To support template storage, email tracking, and status updates, we will use two collections:
+main.py
 
-email_requests (Tracks each request from support users)
-email_status (Stores individual email statuses)
-1. email_requests Collection (Stores Template and Metadata)
-Stores details of each batch request received from the API.
-Includes id, application, tpl file, and status.
-Allows request tracing by requestId.
-json
-Copy
-Edit
-{
-  "_id": "ObjectId('...')",
-  "requestId": "123e4567-e89b-12d3-a456-426614174000",
-  "id": "12345",
-  "application": "AppX",
-  "tplFile": "notification.tpl",
-  "createdAt": "2025-02-05T12:34:56Z",
-  "status": "Processing", // Pending, Success, Failed
-  "userCount": 2000
-}
-📌 Indexes:
+from fastapi import FastAPI, UploadFile, HTTPException, Query, BackgroundTasks
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime, timedelta
+import boto3
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
 
-{ requestId: 1 } ✅ (For tracking requests)
-{ id: 1, application: 1 } ✅ (For validation lookup)
-2. email_status Collection (Stores Each Email Status)
-Stores each email record processed from Kafka.
-Allows tracking success/failure with timestamps and retries.
-json
-Copy
-Edit
-{
-  "_id": "ObjectId('...')",
-  "requestId": "123e4567-e89b-12d3-a456-426614174000",
-  "email": "user@example.com",
-  "status": "Pending", // Success, Failed, Retrying
-  "attempts": 1,
-  "lastAttempt": "2025-02-05T12:35:10Z",
-  "errorMessage": null
-}
-📌 Indexes:
+# Initialize FastAPI
+app = FastAPI(title="Build Metrics API")
 
-{ requestId: 1, email: 1 } ✅ (For fast lookups)
-{ status: 1 } ✅ (For failure retries)
+# AWS S3 Config
+BUCKET_NAME = "build-metrics"
+s3 = boto3.client('s3')
+
+# Local cache for processing
+TEMP_DIR = "./temp"
+os.makedirs(TEMP_DIR, exist_ok=True)
+
+# Supported stacks
+SUPPORTED_STACKS = ["maven", "npm", "gradle", "python", "rust"]
+
+# Pydantic model for query validation
+class ReportRequest(BaseModel):
+    stack: str = Field(..., example="maven", description="Stack name")
+    days: int = Field(..., ge=1, le=90, example=60, description="Number of days to generate report for")
+
+# Pydantic model for file upload validation
+class FileUpload(BaseModel):
+    stack: str = Field(..., example="maven", description="Stack name")
+
+# Root endpoint
+@app.get("/")
+def root():
+    return {"status": "Build Metrics API is running"}
+
+# ✅ File Upload Endpoint
+@app.post("/upload/")
+async def upload_file(file: UploadFile, stack: str = Query(..., example="maven")):
+    if stack not in SUPPORTED_STACKS:
+        raise HTTPException(status_code=400, detail=f"Invalid stack. Supported stacks: {SUPPORTED_STACKS}")
+
+    # Generate filename with date prefix
+    today = datetime.today().strftime('%Y-%m-%d')
+    filename = f"{today}-{stack}.csv"
+    s3_path = f"raw/{stack}/{filename}"
+
+    # Upload file to S3
+    try:
+        s3.upload_fileobj(file.file, BUCKET_NAME, s3_path)
+        return {"status": "success", "file_uploaded": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
+
+# ✅ Report Generation Endpoint
+@app.post("/report/")
+async def generate_report(request: ReportRequest, background_tasks: BackgroundTasks):
+    if request.stack not in SUPPORTED_STACKS:
+        raise HTTPException(status_code=400, detail=f"Invalid stack. Supported stacks: {SUPPORTED_STACKS}")
+
+    background_tasks.add_task(process_report, request.stack, request.days)
+    return {"status": "Report generation started"}
+
+# ✅ Background Task for Report Generation
+def process_report(stack: str, days: int):
+    try:
+        # Get list of files from S3
+        prefix = f"raw/{stack}/"
+        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+        files = sorted(
+            [obj['Key'] for obj in response.get('Contents', [])],
+            reverse=True
+        )
+
+        # Get last `days` days files
+        cutoff_date = (datetime.today() - timedelta(days=days)).strftime('%Y-%m-%d')
+        recent_files = [f for f in files if f.split("/")[-1][:10] >= cutoff_date]
+
+        if not recent_files:
+            raise Exception(f"No files found for last {days} days")
+
+        # Load data from files into DataFrame
+        all_data = []
+        for file in recent_files:
+            obj = s3.get_object(Bucket=BUCKET_NAME, Key=file)
+            data = pd.read_csv(obj['Body'])
+            data["type"] = stack  # Add missing type field
+            all_data.append(data)
+
+        # Merge into single DataFrame
+        df = pd.concat(all_data)
+        df['week'] = pd.to_datetime(df['week'])
+
+        # Plot data
+        plot_report(df, stack, days)
+
+        # Upload report to S3
+        report_filename = f"{datetime.today().strftime('%Y-%m-%d')}-report-{days}-days.png"
+        local_path = f"{TEMP_DIR}/{report_filename}"
+        s3_path = f"processed/{report_filename}"
+
+        s3.upload_file(local_path, BUCKET_NAME, s3_path)
+
+        print(f"Report generated and uploaded: {report_filename}")
+
+    except Exception as e:
+        print(f"Failed to generate report: {str(e)}")
+
+# ✅ Plotting Function
+def plot_report(df, stack, days):
+    plt.figure(figsize=(10, 6))
+
+    # Plot avg, median, and percentile
+    plt.plot(df['week'], df['avg'], label='Avg', marker='o')
+    plt.plot(df['week'], df['median'], label='Median', marker='o')
+    plt.plot(df['week'], df['percentile'], label='Percentile', marker='o')
+
+    plt.title(f"{stack.capitalize()} Performance Over Last {days} Days")
+    plt.xlabel('Week')
+    plt.ylabel('Value')
+    plt.legend()
+    plt.grid(True)
+
+    # Save report
+    filename = f"{TEMP_DIR}/{datetime.today().strftime('%Y-%m-%d')}-report-{days}-days.png"
+    plt.savefig(filename)
+    plt.close()
+
+# ✅ List Available Reports
+@app.get("/reports/")
+async def list_reports():
+    prefix = 'processed/'
+    response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+    files = [obj['Key'] for obj in response.get('Contents', [])]
+    return {"reports": files}
+
+# ✅ Serve Reports Directly
+@app.get("/report/{filename}")
+async def get_report(filename: str):
+    try:
+        url = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': BUCKET_NAME, 'Key': f'processed/{filename}'},
+            ExpiresIn=3600
+        )
+        return {"url": url}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve report: {str(e)}")
+
+# ✅ Run FastAPI
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+---
+
+Scheduler runs every Thursday → Uploads CSV to S3
+User calls /upload/ → Uploads CSV to S3
+User calls /report/ → Processes last n days of data
+Report is stored in /processed/
+User calls /reports/ → Lists available reports
+User calls /report/{filename} → Downloads report
+
+---
+
+pip install streamlit requests matplotlib pandas
+
+---
+import streamlit as st
+import requests
+import pandas as pd
+import matplotlib.pyplot as plt
+from datetime import datetime
+
+# Backend API URL
+API_URL = "http://localhost:8000"  # Adjust if using Docker or different host
+
+# Streamlit UI Configuration
+st.set_page_config(page_title="Build Metrics Dashboard", layout="wide")
+
+# 🎯 Title
+st.title("📊 Build Metrics Dashboard")
+
+# ✅ File Upload Section
+st.sidebar.header("Upload CSV File")
+uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
+stack = st.sidebar.selectbox("Select Stack", ["maven", "npm", "python", "rust", "gradle"])
+
+if uploaded_file and stack:
+    if st.sidebar.button("Upload"):
+        files = {"file": uploaded_file}
+        params = {"stack": stack}
+
+        # Call FastAPI backend to upload file
+        response = requests.post(f"{API_URL}/upload/", files=files, params=params)
+
+        if response.status_code == 200:
+            st.sidebar.success(f"✅ File uploaded for stack: {stack}")
+        else:
+            st.sidebar.error(f"❌ Error: {response.json().get('detail')}")
+
+# ✅ Report Generation Section
+st.sidebar.header("Generate Report")
+stack = st.sidebar.selectbox("Stack for Report", ["maven", "npm", "python", "rust", "gradle"], key="report_stack")
+days = st.sidebar.slider("Number of Days", 1, 90, 30)
+
+if st.sidebar.button("Generate Report"):
+    payload = {"stack": stack, "days": days}
+    
+    # Call FastAPI backend to generate report
+    response = requests.post(f"{API_URL}/report/", json=payload)
+    if response.status_code == 200:
+        st.sidebar.success(f"✅ Report generation started for {stack} ({days} days)")
+    else:
+        st.sidebar.error(f"❌ Error: {response.json().get('detail')}")
+
+# ✅ Display Reports Section
+st.header("📈 Available Reports")
+
+# Fetch available reports from FastAPI
+report_list_response = requests.get(f"{API_URL}/reports/")
+if report_list_response.status_code == 200:
+    reports = report_list_response.json().get("reports", [])
+    selected_report = st.selectbox("Select Report", reports)
+
+    if st.button("Show Report"):
+        if selected_report:
+            # Generate presigned URL for download
+            report_response = requests.get(f"{API_URL}/report/{selected_report}")
+            if report_response.status_code == 200:
+                report_url = report_response.json().get("url")
+
+                # Display the report directly in Streamlit
+                st.image(report_url, use_column_width=True)
+
+                st.markdown(f"[📥 Download Report]({report_url})", unsafe_allow_html=True)
+            else:
+                st.error("❌ Error loading report")
+        else:
+            st.warning("⚠️ No report selected.")
+else:
+    st.error("❌ Failed to load reports")
+
+# ✅ Recent Data Preview Section
+st.header("📝 Recent Data Preview")
+
+if stack:
+    prefix = f"raw/{stack}/"
+    response = requests.get(f"{API_URL}/reports/")
+    files = response.json().get("reports", [])
+    latest_file = [f for f in files if f.startswith(prefix)]
+
+    if latest_file:
+        # Read CSV from S3 presigned URL
+        latest_file_key = latest_file[-1]
+        url_response = requests.get(f"{API_URL}/report/{latest_file_key}")
+        if url_response.status_code == 200:
+            url = url_response.json().get("url")
+            df = pd.read_csv(url)
+            st.write(df.head())
+        else:
+            st.error("❌ Failed to fetch latest file")
+
+---
+
+## 📊 **Resulting UI**  
+1. **Sidebar** → Upload CSV + Report Generation Options  
+2. **Main Panel** → Display list of available reports  
+3. **Chart** → Directly displayed after fetching report  
+4. **Data Table** → Preview of raw data  
+
+---
+
+## ✅ **Advantages**  
+✅ Streamlit handles API calls directly  
+✅ Automatic chart rendering  
+✅ Handles CSV upload  
+✅ Fully interactive with minimal code  
+✅ FastAPI handles the backend processing  
+
+---
+
+## 🚀 **Running the Application**  
+### 1. Start FastAPI Backend:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+
+----
+
+streamlit run streamlit_ui.py
