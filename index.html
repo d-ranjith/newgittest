@@ -1,317 +1,158 @@
-# FastAPI and web server
-fastapi==0.110.0
-uvicorn==0.29.0
-
-# AWS S3 interaction
-boto3==1.34.77
-
-# Data handling and plotting
-pandas==2.2.1
-matplotlib==3.8.4
-seaborn==0.13.2
-
-# Validation and Pydantic support
-pydantic==2.7.0
-
-# Streamlit for UI
-streamlit==1.33.0
-
-# Logging and utilities
-python-dotenv==1.0.1
-loguru==0.7.2
-
-main.py
-
-from fastapi import FastAPI, UploadFile, HTTPException, Query, BackgroundTasks
-from pydantic import BaseModel, Field
-from typing import List, Optional
-from datetime import datetime, timedelta
-import boto3
-import pandas as pd
-import matplotlib.pyplot as plt
-import os
-
-# Initialize FastAPI
-app = FastAPI(title="Build Metrics API")
-
-# AWS S3 Config
-BUCKET_NAME = "build-metrics"
-s3 = boto3.client('s3')
-
-# Local cache for processing
-TEMP_DIR = "./temp"
-os.makedirs(TEMP_DIR, exist_ok=True)
-
-# Supported stacks
-SUPPORTED_STACKS = ["maven", "npm", "gradle", "python", "rust"]
-
-# Pydantic model for query validation
-class ReportRequest(BaseModel):
-    stack: str = Field(..., example="maven", description="Stack name")
-    days: int = Field(..., ge=1, le=90, example=60, description="Number of days to generate report for")
-
-# Pydantic model for file upload validation
-class FileUpload(BaseModel):
-    stack: str = Field(..., example="maven", description="Stack name")
-
-# Root endpoint
-@app.get("/")
-def root():
-    return {"status": "Build Metrics API is running"}
-
-# ✅ File Upload Endpoint
-@app.post("/upload/")
-async def upload_file(file: UploadFile, stack: str = Query(..., example="maven")):
-    if stack not in SUPPORTED_STACKS:
-        raise HTTPException(status_code=400, detail=f"Invalid stack. Supported stacks: {SUPPORTED_STACKS}")
-
-    # Generate filename with date prefix
-    today = datetime.today().strftime('%Y-%m-%d')
-    filename = f"{today}-{stack}.csv"
-    s3_path = f"raw/{stack}/{filename}"
-
-    # Upload file to S3
-    try:
-        s3.upload_fileobj(file.file, BUCKET_NAME, s3_path)
-        return {"status": "success", "file_uploaded": filename}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload file: {str(e)}")
-
-# ✅ Report Generation Endpoint
-@app.post("/report/")
-async def generate_report(request: ReportRequest, background_tasks: BackgroundTasks):
-    if request.stack not in SUPPORTED_STACKS:
-        raise HTTPException(status_code=400, detail=f"Invalid stack. Supported stacks: {SUPPORTED_STACKS}")
-
-    background_tasks.add_task(process_report, request.stack, request.days)
-    return {"status": "Report generation started"}
-
-# ✅ Background Task for Report Generation
-def process_report(stack: str, days: int):
-    try:
-        # Get list of files from S3
-        prefix = f"raw/{stack}/"
-        response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
-        files = sorted(
-            [obj['Key'] for obj in response.get('Contents', [])],
-            reverse=True
-        )
-
-        # Get last `days` days files
-        cutoff_date = (datetime.today() - timedelta(days=days)).strftime('%Y-%m-%d')
-        recent_files = [f for f in files if f.split("/")[-1][:10] >= cutoff_date]
-
-        if not recent_files:
-            raise Exception(f"No files found for last {days} days")
-
-        # Load data from files into DataFrame
-        all_data = []
-        for file in recent_files:
-            obj = s3.get_object(Bucket=BUCKET_NAME, Key=file)
-            data = pd.read_csv(obj['Body'])
-            data["type"] = stack  # Add missing type field
-            all_data.append(data)
-
-        # Merge into single DataFrame
-        df = pd.concat(all_data)
-        df['week'] = pd.to_datetime(df['week'])
-
-        # Plot data
-        plot_report(df, stack, days)
-
-        # Upload report to S3
-        report_filename = f"{datetime.today().strftime('%Y-%m-%d')}-report-{days}-days.png"
-        local_path = f"{TEMP_DIR}/{report_filename}"
-        s3_path = f"processed/{report_filename}"
-
-        s3.upload_file(local_path, BUCKET_NAME, s3_path)
-
-        print(f"Report generated and uploaded: {report_filename}")
-
-    except Exception as e:
-        print(f"Failed to generate report: {str(e)}")
-
-# ✅ Plotting Function
-def plot_report(df, stack, days):
-    plt.figure(figsize=(10, 6))
-
-    # Plot avg, median, and percentile
-    plt.plot(df['week'], df['avg'], label='Avg', marker='o')
-    plt.plot(df['week'], df['median'], label='Median', marker='o')
-    plt.plot(df['week'], df['percentile'], label='Percentile', marker='o')
-
-    plt.title(f"{stack.capitalize()} Performance Over Last {days} Days")
-    plt.xlabel('Week')
-    plt.ylabel('Value')
-    plt.legend()
-    plt.grid(True)
-
-    # Save report
-    filename = f"{TEMP_DIR}/{datetime.today().strftime('%Y-%m-%d')}-report-{days}-days.png"
-    plt.savefig(filename)
-    plt.close()
-
-# ✅ List Available Reports
-@app.get("/reports/")
-async def list_reports():
-    prefix = 'processed/'
-    response = s3.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
-    files = [obj['Key'] for obj in response.get('Contents', [])]
-    return {"reports": files}
-
-# ✅ Serve Reports Directly
-@app.get("/report/{filename}")
-async def get_report(filename: str):
-    try:
-        url = s3.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': BUCKET_NAME, 'Key': f'processed/{filename}'},
-            ExpiresIn=3600
-        )
-        return {"url": url}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve report: {str(e)}")
-
-# ✅ Run FastAPI
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
----
-
-Scheduler runs every Thursday → Uploads CSV to S3
-User calls /upload/ → Uploads CSV to S3
-User calls /report/ → Processes last n days of data
-Report is stored in /processed/
-User calls /reports/ → Lists available reports
-User calls /report/{filename} → Downloads report
-
----
-
-pip install streamlit requests matplotlib pandas
-
----
-import streamlit as st
-import requests
-import pandas as pd
-import matplotlib.pyplot as plt
-from datetime import datetime
-
-# Backend API URL
-API_URL = "http://localhost:8000"  # Adjust if using Docker or different host
-
-# Streamlit UI Configuration
-st.set_page_config(page_title="Build Metrics Dashboard", layout="wide")
-
-# 🎯 Title
-st.title("📊 Build Metrics Dashboard")
-
-# ✅ File Upload Section
-st.sidebar.header("Upload CSV File")
-uploaded_file = st.sidebar.file_uploader("Upload CSV", type=["csv"])
-stack = st.sidebar.selectbox("Select Stack", ["maven", "npm", "python", "rust", "gradle"])
-
-if uploaded_file and stack:
-    if st.sidebar.button("Upload"):
-        files = {"file": uploaded_file}
-        params = {"stack": stack}
-
-        # Call FastAPI backend to upload file
-        response = requests.post(f"{API_URL}/upload/", files=files, params=params)
-
-        if response.status_code == 200:
-            st.sidebar.success(f"✅ File uploaded for stack: {stack}")
-        else:
-            st.sidebar.error(f"❌ Error: {response.json().get('detail')}")
-
-# ✅ Report Generation Section
-st.sidebar.header("Generate Report")
-stack = st.sidebar.selectbox("Stack for Report", ["maven", "npm", "python", "rust", "gradle"], key="report_stack")
-days = st.sidebar.slider("Number of Days", 1, 90, 30)
-
-if st.sidebar.button("Generate Report"):
-    payload = {"stack": stack, "days": days}
-    
-    # Call FastAPI backend to generate report
-    response = requests.post(f"{API_URL}/report/", json=payload)
-    if response.status_code == 200:
-        st.sidebar.success(f"✅ Report generation started for {stack} ({days} days)")
-    else:
-        st.sidebar.error(f"❌ Error: {response.json().get('detail')}")
-
-# ✅ Display Reports Section
-st.header("📈 Available Reports")
-
-# Fetch available reports from FastAPI
-report_list_response = requests.get(f"{API_URL}/reports/")
-if report_list_response.status_code == 200:
-    reports = report_list_response.json().get("reports", [])
-    selected_report = st.selectbox("Select Report", reports)
-
-    if st.button("Show Report"):
-        if selected_report:
-            # Generate presigned URL for download
-            report_response = requests.get(f"{API_URL}/report/{selected_report}")
-            if report_response.status_code == 200:
-                report_url = report_response.json().get("url")
-
-                # Display the report directly in Streamlit
-                st.image(report_url, use_column_width=True)
-
-                st.markdown(f"[📥 Download Report]({report_url})", unsafe_allow_html=True)
-            else:
-                st.error("❌ Error loading report")
-        else:
-            st.warning("⚠️ No report selected.")
-else:
-    st.error("❌ Failed to load reports")
-
-# ✅ Recent Data Preview Section
-st.header("📝 Recent Data Preview")
-
-if stack:
-    prefix = f"raw/{stack}/"
-    response = requests.get(f"{API_URL}/reports/")
-    files = response.json().get("reports", [])
-    latest_file = [f for f in files if f.startswith(prefix)]
-
-    if latest_file:
-        # Read CSV from S3 presigned URL
-        latest_file_key = latest_file[-1]
-        url_response = requests.get(f"{API_URL}/report/{latest_file_key}")
-        if url_response.status_code == 200:
-            url = url_response.json().get("url")
-            df = pd.read_csv(url)
-            st.write(df.head())
-        else:
-            st.error("❌ Failed to fetch latest file")
-
----
-
-## 📊 **Resulting UI**  
-1. **Sidebar** → Upload CSV + Report Generation Options  
-2. **Main Panel** → Display list of available reports  
-3. **Chart** → Directly displayed after fetching report  
-4. **Data Table** → Preview of raw data  
-
----
-
-## ✅ **Advantages**  
-✅ Streamlit handles API calls directly  
-✅ Automatic chart rendering  
-✅ Handles CSV upload  
-✅ Fully interactive with minimal code  
-✅ FastAPI handles the backend processing  
-
----
-
-## 🚀 **Running the Application**  
-### 1. Start FastAPI Backend:
-```bash
-uvicorn main:app --host 0.0.0.0 --port 8000
-
-
-----
-
-streamlit run streamlit_ui.py
+Solution Design Document: ATX Withholding Tax Microservice
+1. 📌 Executive Summary
+OrgA must respond to regulatory changes introduced by the U.S. Government requiring new withholding tax calculations across different jurisdictions and products. The current Java-based monolith (ATX) is hard to maintain and scale. This design proposes a microservices-based approach beginning with a focused POC that isolates the withholding tax computation logic and decouples the UI layer. This serves as a foundation for full modernization and future cloud migration.
+
+2. 🎯 Goal Statement (One-liner)
+"Modernize and modularize the ATX tax engine to enable faster compliance updates, improved maintainability, and readiness for cloud deployment."
+
+3. 📈 Business Motivation (Situation, Outcome, Metrics, Benefits, Solution)
+Category	Description
+Situation (Drives)	New U.S. withholding tax rules require rapid implementation; existing monolith (ATX) is too complex and slow to adapt
+Outcome (Guides)	Build a tax computation microservice and decouple UI to prove the microservices approach
+Metrics (Measured by)	Time to deliver changes, regression issues, build/deployment frequency, time to test
+Benefits (Created)	Faster tax rule updates, easier testing, modular deployments, reduced risk of knock-on issues
+Solution (Enablers)	Microservice architecture, Spring Boot, REST APIs, containerization, secure rate update endpoint, cloud-native design principles
+
+4. 🧠 High-Level Architecture
+pgsql
+Copy
+Edit
++----------------------+        +---------------------------+       +----------------------------+
+|     Web Frontend     | <-->   |  API Gateway (Optional)   | <-->  |  Tax Computation Service   |
+| (Thymeleaf React UI) |        | (Authentication, Routing) |       |  - Withholding Rules       |
++----------------------+        +---------------------------+       |  - EU Country Mapping      |
+                                                                     |  - Admin Rate Update API   |
+                                                                     +----------------------------+
+
+                    +------------------------+
+                    | Reference Data Storage |
+                    | - ISO Country Rates    |
+                    | - EU Country Codes     |
+                    +------------------------+
+5. 🧩 Components and Responsibilities
+Component	Description
+Frontend UI	Thymeleaf-based or React frontend; collects input (ISO code, USD income) and displays results
+API Gateway (Optional)	Handles rate limiting, auth, routing
+Tax Computation Service	Stateless Spring Boot microservice with /compute endpoint
+Rate Admin API	Secured endpoint to modify tax rates dynamically
+Data Store (Optional in POC)	JSON file, H2, or Redis for country rates and EU country mappings
+
+6. ⚙️ Key Endpoints
+6.1. /compute
+http
+Copy
+Edit
+POST /api/tax/compute
+{
+  "isoCountryCode": "AT",
+  "incomeUsd": 10000.0
+}
+Logic:
+
+Map EU country codes to "EU"
+
+Look up rate (default 30% if not found)
+
+Compute: withholding = rate * income
+
+Output:
+
+json
+Copy
+Edit
+{
+  "withholdingTaxAmount": 1500.0,
+  "appliedRate": 0.15
+}
+6.2. /admin/rate (future or Day 3 optional)
+http
+Copy
+Edit
+POST /api/admin/rate
+{
+  "isoCountryCode": "AU",
+  "rate": 0.12
+}
+7. ☁️ Cloud & DevOps Considerations
+Area	Practice
+Containerization	Dockerfile with Spring Boot app
+CI/CD	GitHub Actions or Tekton pipeline
+Secrets	Store DB/API keys in K8s secrets or AWS Secrets Manager
+Deployment	Use Helm charts or K8s manifests
+Monitoring	Spring Boot Actuator + Prometheus
+Security	JWT or OAuth2 for admin endpoints
+Rate Update Audit	Store changes with timestamps and user IDs (future phase)
+
+8. 🧪 Testing Approach
+Test Type	Description
+Unit Tests	Tax calculation logic, ISO mapping
+Integration Tests	REST endpoint verification
+Contract Tests	OpenAPI definition match
+Security Tests	Rate update auth check
+Mock Tests	Mocked country rate data service
+
+9. 🚀 Implementation Plan: 3-Day POC
+Day	Activity
+Day 1	Understand code logic, isolate /post logic from monolith, scaffold new microservice (Spring Boot), create EU country mapping, test calculation logic
+Day 2	Build frontend UI (Thymeleaf or React), expose /compute endpoint, containerize app, prepare presentation deck
+Day 3	(Optional) Implement /admin/rate, CI pipeline, prepare Helm chart or Docker Compose, stakeholder presentation
+
+10. 📊 Design Decisions
+Area	Decision
+Service Granularity	Single microservice for tax computation now; may split country lookup, audit, and rules into separate services later
+Storage	In-memory for POC, DB/Redis for production
+Security	Basic auth/JWT for admin endpoint
+Cloud Readiness	Full containerization, stateless, external configs
+Data Source	Country rate map and EU country list (mocked for now)
+
+11. 🔒 Security Practices
+Role-based access control (admin vs compute)
+
+Encrypted secrets and credentials
+
+Validate input with ISO code regex
+
+Enable HTTPS (in cloud environments)
+
+Rate limiting and throttling via API Gateway (e.g., Kong, Istio)
+
+12. 📎 Appendices
+A. Example EU ISO Mapping
+json
+Copy
+Edit
+{
+  "AT": "EU", "BE": "EU", "DE": "EU", ..., "FR": "EU"
+}
+B. Sample Country Tax Rate Table
+json
+Copy
+Edit
+{
+  "US": 0.0,
+  "EU": 0.15,
+  "AU": 0.15,
+  "CA": 0.15,
+  "DEFAULT": 0.30
+}
+C. Swagger/OpenAPI Sample Snippet
+yaml
+Copy
+Edit
+paths:
+  /api/tax/compute:
+    post:
+      summary: Calculate tax withholding
+      requestBody:
+        ...
+13. 📢 Next Steps After POC
+Refactor remaining ATX monolith components into services
+
+Move to AWS/GCP/Azure (based on OrgA's strategy)
+
+Enable versioned tax rule APIs for future legal changes
+
+Integrate with enterprise data sources (legal entity, reference data)
+
+Enhance with role-based UI and analytics dashboard
+
