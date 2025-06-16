@@ -1,28 +1,89 @@
-atx-tax-service/
-├── src/
-│   ├── main/
-│   │   ├── java/com/orga/tax/
-│   │   │   ├── controller/
-│   │   │   │   └── TaxComputeController.java
-│   │   │   │   └── AdminRateController.java
-│   │   │   ├── service/
-│   │   │   │   ├── TaxComputationService.java (interface)
-│   │   │   │   ├── TaxComputationServiceImpl.java (default impl)
-│   │   │   │   ├── EquitiesTaxComputationService.java
-│   │   │   │   └── FITaxComputationService.java
-│   │   │   ├── model/
-│   │   │   │   ├── TaxRequest.java
-│   │   │   │   ├── TaxResponse.java
-│   │   │   │   ├── RateUpdateRequest.java
-│   │   │   ├── config/
-│   │   │   │   └── DomainTaxServiceFactory.java
-│   │   │   ├── data/
-│   │   │   │   └── RateRepository.java (in-memory map)
-│   │   │   │   └── EUMappingRepository.java
-│   │   │   └── AtxTaxServiceApplication.java
-│   │   └── resources/
-│   │       ├── application.yml
-│   │       └── tax-rates.json
-│   │       └── eu-countries.json
-│   └── test/
-│       └── ... Unit and integration tests
+🦀 Rust Build Support in Tekton – Usage Guidelines and Guardrails
+We’ve introduced Rust build support as a Tekton Task to help teams integrate Rust crate compilation and artifact publishing into their CI/CD pipelines. Below is the technical guidance for using this task effectively and securely.
+
+🔧 Tekton Task Overview
+The task compiles Rust code using cargo build and optionally runs cargo test.
+
+Build artifacts (.crate files) are published to Artifactory after successful builds.
+
+Compatible with existing CI/CD environments in OpenShift-based clusters.
+
+📦 Publishing to Artifactory
+Rust crate artifacts are published to the shared Artifactory Cargo registry.
+
+Each team must prefix their crate names/folders with their appid to uniquely identify and isolate their crates.
+
+Example:
+
+toml
+Copy
+Edit
+# In Cargo.toml
+name = "myteam123-mylib"
+This helps prevent name collisions and overwrites.
+
+⚠️ Important Guardrails and Caveats
+Shared Namespace: All crates are published under a common (public) namespace in Artifactory.
+
+Artifacts can be overridden or consumed by other teams if naming is not properly managed.
+
+No Write Protection: Artifactory currently does not enforce appid-specific write protection. Crates are effectively public within the org.
+
+Teams are responsible for:
+
+Ensuring uniqueness of crate names using appid prefixing.
+
+Verifying their own crate dependencies to avoid unintentional conflicts.
+
+📝 Required Metadata in Cargo.toml
+To support traceability and artifact validation, include the following metadata in your Cargo.toml:
+
+toml
+Copy
+Edit
+[package]
+name = "myappid-mycrate"
+version = "0.1.0"
+authors = ["Team ABC <teamabc@example.com>"]
+description = "Crate for XYZ functionality, built and published by MyAppID"
+license = "MIT"
+repository = "https://git.org/path-to-repo"
+This metadata helps the Artifactory team and internal tooling identify:
+
+Owning team or appid
+
+Source repo
+
+Contact point (authors)
+
+📏 Standard Naming and Structuring Guidelines
+Prefix every crate name with your org-wide appid.
+
+Use hyphen (-) as separator for better readability.
+
+✅ myteam-logger
+
+❌ logger or myteamlogger
+
+Use semantic versioning for crate versions.
+
+Keep Cargo.toml and Cargo.lock committed to version control.
+
+📎 Suggested Tekton Usage
+yaml
+Copy
+Edit
+steps:
+  - name: rust-build
+    image: rust:1.72
+    script: |
+      cargo build --release
+      cargo publish --token $CARGO_TOKEN
+📌 Set CARGO_TOKEN as a Kubernetes Secret injected into the pipeline.
+
+📣 Future Improvements
+Plans to restrict Artifactory write access by appid in upcoming phases.
+
+Monitoring crate versioning and duplication patterns for better governance.
+
+Considering automated validation hooks during Tekton builds to enforce naming rules.
