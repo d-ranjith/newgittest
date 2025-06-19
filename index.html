@@ -1,89 +1,51 @@
-🦀 Rust Build Support in Tekton – Usage Guidelines and Guardrails
-We’ve introduced Rust build support as a Tekton Task to help teams integrate Rust crate compilation and artifact publishing into their CI/CD pipelines. Below is the technical guidance for using this task effectively and securely.
+ 1. Standardizing Rust Release Conventions for Internal CI/CD Platform
+Primary Corporate Goal: Client & Franchise Outcomes
 
-🔧 Tekton Task Overview
-The task compiles Rust code using cargo build and optionally runs cargo test.
+Successfully delivered a set of standardized production release guidelines tailored for Rust developers using the enterprise CI/CD platform built on OpenShift, Tekton, and Harness.
 
-Build artifacts (.crate files) are published to Artifactory after successful builds.
+Partnered with early Rust service teams and the shared infrastructure team managing Artifactory to align on conventions for metadata, artifact publishing, and ownership traceability.
 
-Compatible with existing CI/CD environments in OpenShift-based clusters.
+Facilitated working sessions and secured cross-team buy-in, leading to successful adoption by multiple Rust services across the organization.
 
-📦 Publishing to Artifactory
-Rust crate artifacts are published to the shared Artifactory Cargo registry.
+Published documentation and examples to simplify onboarding and ensure frictionless developer experience.
 
-Each team must prefix their crate names/folders with their appid to uniquely identify and isolate their crates.
+This initiative directly supports internal developer teams by improving release reliability, creating a consistent user experience, and reducing ambiguity when pushing Rust services to production.
 
-Example:
+2. Persisting CI/CD Build Metrics Beyond 90 Days to Improve Visibility
+Primary Corporate Goal: Risk & Controls
 
-toml
-Copy
-Edit
-# In Cargo.toml
-name = "myteam123-mylib"
-This helps prevent name collisions and overwrites.
+Designed and implemented an API and Splunk UI integration to consume CI/CD build events and persist them to an S3 bucket, extending visibility well beyond the default 90-day Splunk retention period.
 
-⚠️ Important Guardrails and Caveats
-Shared Namespace: All crates are published under a common (public) namespace in Artifactory.
+Enabled weekly automated data ingestion through a Splunk webhook, with over 6 months of historical data now available for trend analysis and issue investigation.
 
-Artifacts can be overridden or consumed by other teams if naming is not properly managed.
+This solution directly addresses a risk gap: the inability to observe long-term patterns or regressions in build performance, especially after infrastructure or Tekton upgrades.
 
-No Write Protection: Artifactory currently does not enforce appid-specific write protection. Crates are effectively public within the org.
+By enabling long-term performance baselines, the system reduces the operational risk of undetected build degradations that could impact developer teams.
 
-Teams are responsible for:
+Solution is now live and stable, with feedback gathering planned to iterate based on platform and user team needs.
 
-Ensuring uniqueness of crate names using appid prefixing.
+✅ 3. Infrastructure Performance Monitoring for Upcoming Tekton TaskHooks Rollout
+Primary Corporate Goal: Risk & Controls
 
-Verifying their own crate dependencies to avoid unintentional conflicts.
+Initiated proactive assessment of the potential infrastructure impact of converting Tekton Run steps to TaskRun executions (internally referred to as TaskHooks), a change that could increase the number of concurrent TaskRuns and pods in the OpenShift clusters.
 
-📝 Required Metadata in Cargo.toml
-To support traceability and artifact validation, include the following metadata in your Cargo.toml:
+The concern is that shared TaskRuns across multiple pipelines could lead to increased CPU and memory usage at scale, affecting cluster stability and scheduling performance.
 
-toml
-Copy
-Edit
-[package]
-name = "myappid-mycrate"
-version = "0.1.0"
-authors = ["Team ABC <teamabc@example.com>"]
-description = "Crate for XYZ functionality, built and published by MyAppID"
-license = "MIT"
-repository = "https://git.org/path-to-repo"
-This metadata helps the Artifactory team and internal tooling identify:
+Designed a monitoring strategy using Grafana, aimed at visualizing memory and CPU trends before and after rollout, spanning across multiple OpenShift clusters.
 
-Owning team or appid
+Built 3 out of the 10 planned Grafana panels, tracking key resource metrics like pod count growth, CPU/memory usage patterns, and pod lifecycle trends tied to Tekton workloads. The remaining dashboards are actively in development, with full delivery targeted by end of June — ahead of the TaskHooks rollout.
 
-Source repo
+This initiative enables data-driven rollout decisions and capacity planning, reducing the risk of production instability during the CI/CD platform upgrade.
 
-Contact point (authors)
+4. Leading Advanced Engineering Initiative to Improve DORA Metrics Adoption
+Primary Corporate Goal: Leadership Principles
 
-📏 Standard Naming and Structuring Guidelines
-Prefix every crate name with your org-wide appid.
+Participated in an Advanced Engineering training initiative from March through September, supporting enterprise-wide efforts to modernize CI/CD practices and improve platform adoption of DORA (DevOps Research and Assessment) metrics through Project FI.
 
-Use hyphen (-) as separator for better readability.
+Directly assisted 15 CI/CD pipeline teams in integrating and evaluating their performance against key DORA metrics, such as lead time, deployment frequency, and mean time to recovery — with a focus on improving engineering velocity and reducing cycle time.
 
-✅ myteam-logger
+Acted as a mentor and technical advisor to peer participants in the training cohort, sharing best practices in CI/CD, build optimizations, and test automation to influence their project trajectories.
 
-❌ logger or myteamlogger
+Currently 40% of the transformation efforts are complete, with the remaining planned through September. Provided regular status updates, and stakeholder briefings, and demonstrated leadership in aligning platform capabilities with real-world engineering outcomes.
 
-Use semantic versioning for crate versions.
-
-Keep Cargo.toml and Cargo.lock committed to version control.
-
-📎 Suggested Tekton Usage
-yaml
-Copy
-Edit
-steps:
-  - name: rust-build
-    image: rust:1.72
-    script: |
-      cargo build --release
-      cargo publish --token $CARGO_TOKEN
-📌 Set CARGO_TOKEN as a Kubernetes Secret injected into the pipeline.
-
-📣 Future Improvements
-Plans to restrict Artifactory write access by appid in upcoming phases.
-
-Monitoring crate versioning and duplication patterns for better governance.
-
-Considering automated validation hooks during Tekton builds to enforce naming rules.
+Also engaged in multiple leadership and project management workshops, taking ownership of coordination across teams and presenting technical benefits, ROI, and next steps for wider adoption.
