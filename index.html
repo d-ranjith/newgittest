@@ -74,14 +74,13 @@ index=your_index_name_here earliest=-1h latest=now | limit 50000
 | rename data.buildId AS buildId
 | rename data.pipelineName AS pipeline_name
 | spath input=data.build.tasks{}
-| eval tasks = mvzip(data.build.tasks{}.name, data.build.tasks{}.refName, data.build.tasks{}.status.state, data.build.tasks{}.status.startTime, data.build.tasks{}.status.completionTime)
-| eval git_clone_task = mvfilter(match(tasks, "git-clone") AND match(tasks, "succeed"))
-| eval deployment_trigger_task = mvfilter(match(tasks, "deployment-trigger") AND match(tasks, "succeed"))
-| eval build_task = mvfilter(match(tasks, "java-gradle-build|npm-build"))
-| where isnotnull(build_task) AND isnotnull(git_clone_task) AND isnotnull(deployment_trigger_task)
-| eval git_clone_startTime = mvindex(split(git_clone_task, ","), 3)
-| eval deployment_trigger_completionTime = mvindex(split(deployment_trigger_task, ","), 4)
+| eval git_clone_state = mvindex(data.build.tasks{}.status.state, match(data.build.tasks{}.refName, "git-clone"))
+| eval git_clone_startTime = mvindex(data.build.tasks{}.status.startTime, match(data.build.tasks{}.refName, "git-clone"))
+| eval deployment_trigger_state = mvindex(data.build.tasks{}.status.state, match(data.build.tasks{}.refName, "deployment-trigger"))
+| eval deployment_trigger_completionTime = mvindex(data.build.tasks{}.status.completionTime, match(data.build.tasks{}.refName, "deployment-trigger"))
+| eval build_task_refName = mvindex(data.build.tasks{}.refName, match(data.build.tasks{}.refName, "java-gradle-build|npm-build"))
+| where git_clone_state="succeed" AND deployment_trigger_state="succeed" AND isnotnull(build_task_refName)
 | eval user_pipeline_duration_seconds = round(strptime(deployment_trigger_completionTime, "%Y-%m-%dT%H:%M:%S.%Q%Z") - strptime(git_clone_startTime, "%Y-%m-%dT%H:%M:%S.%Q%Z"))
-| eval stack_name = mvindex(split(build_task, ","), 1)
+| eval stack_name = build_task_refName
 | eval pipeline_completionTime = data.status.completionTime
 | table pipeline_run_created, buildId, pipeline_name, stack_name, user_pipeline_duration_seconds, pipeline_completionTime
