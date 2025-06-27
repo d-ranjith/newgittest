@@ -1,86 +1,43 @@
-index=your_index sourcetype=your_sourcetype
-earliest=-1h@h latest=now
-| spath
-| where strptime(data.status.creationTime, "%Y-%m-%dT%H:%M:%S.%3NZ") >= relative_time(now(), "-1h") 
-| eval tasks_array = data.build.tasks{}
-| mvexpand tasks_array
-| eval ref_name = tasks_array.refName,
-       state = tasks_array.status.state,
-       start_time = strptime(tasks_array.status.startTime, "%Y-%m-%dT%H:%M:%S.%3NZ"),
-       completion_time = strptime(tasks_array.status.completionTime, "%Y-%m-%dT%H:%M:%S.%3NZ"),
-       creation_time = strptime(tasks_array.status.creationTime, "%Y-%m-%dT%H:%M:%S.%3NZ"),
-       duration_sec = tasks_array.status.durationSeconds
-| stats 
-    values(start_time) AS start_times 
-    values(creation_time) AS creation_times 
-    values(completion_time) AS completion_times 
-    values(state) AS states 
-    by data.buildId data.pipelineName data.status.creationTime
-| eval has_stack_task = if(mvcount(filter(start_times, match(states, ".*") AND match(start_times, ".*") ))>0,1,0) 
-| eval has_java_gradle = if(isnotnull(mvfind(data.build.tasks{}.refName,"java-gradle-build|npm-build|python-build|scala-build|rust-build")),1,0)
-| eval has_git_clone = if(isnotnull(mvfind(data.build.tasks{}.refName,"git-clone")),1,0)
-| eval has_deployment_trigger = if(isnotnull(mvfind(data.build.tasks{}.refName,"deployment-trigger")),1,0)
-| where has_java_gradle=1 AND has_git_clone=1 AND has_deployment_trigger=1
-| eval git_clone_start = strptime(spath(output_git, "data.build.tasks{refName=\"git-clone\"}.status.startTime"), "%Y-%m-%dT%H:%M:%S.%3NZ")
-| eval deployment_trigger_end = strptime(spath(output_trigger, "data.build.tasks{refName=\"deployment-trigger\"}.status.creationTime"), "%Y-%m-%dT%H:%M:%S.%3NZ")
-| eval user_pipeline_duration_seconds = deployment_trigger_end - git_clone_start
-| eval pipeline_run_created = data.status.creationTime,
-       pipeline_duration = if(data.status.state=="succeed",
-                           strptime(data.status.completionTime, "%Y-%m-%dT%H:%M:%S.%3NZ") - strptime(data.status.creationTime, "%Y-%m-%dT%H:%M:%S.%3NZ"),
-                           null())
-| table pipeline_run_created data.buildId data.pipelineName user_pipeline_duration_seconds pipeline_duration
+1. Client & Franchise Outcomes Goal
+SMART Goal:
+Standardize production release guidelines for Rust services used across the internal CI/CD platform by aligning Rust developers and shared infrastructure teams, and deliver adoption-ready documentation and support by end of Q2.
 
+First 6 Months Achievement:
 
-| inputlookup my_data max=50000
-| where 'data.status.creationTime'>=relative_time(now(), "-1h")
-| spath path=data.build.tasks{} output=tasks
-| mvexpand tasks
-| spath input=tasks path=refName output=refName
-| spath input=tasks path=status.state output=task_state
-| spath input=tasks path=status.startTime output=task_startTime
-| spath input=tasks path=status.creationTime output=task_creationTime
-| spath input=tasks path=status.completionTime output=task_completionTime
-| where refName IN ("java-gradle-build", "npm-build")
-| eval stack_name=refName
-| join type=outer buildId [
-    | inputlookup my_data max=50000
-    | where 'data.status.creationTime'>=relative_time(now(), "-1h")
-    | spath path=data.build.tasks{} output=tasks
-    | mvexpand tasks
-    | spath input=tasks path=refName output=refName
-    | spath input=tasks path=status.state output=task_state
-    | spath input=tasks path=status.startTime output=task_startTime
-    | spath input=tasks path=status.creationTime output=task_creationTime
-    | where refName IN ("git-clone", "deployment-trigger") AND task_state="succeed"
-    | eval task_type=case(refName="git-clone", "git_clone_time", refName="deployment-trigger", "deployment_trigger_time")
-    | eval task_time=if(refName="git-clone", task_startTime, task_creationTime)
-    | stats values(task_time) as task_time by buildId, task_type
-    | eval git_clone_time=mvindex(task_time, mvfind(task_type, "git_clone_time"))
-    | eval deployment_trigger_time=mvindex(task_time, mvfind(task_type, "deployment_trigger_time"))
-    | where isnotnull(git_clone_time) AND isnotnull(deployment_trigger_time)
-    | eval user_pipeline_duration_seconds=(strptime(deployment_trigger_time, "%Y-%m-%dT%H:%M:%S.000Z") - strptime(git_clone_time, "%Y-%m-%dT%H:%M:%S.000Z"))
-]
-| spath path=data.status.creationTime output=pipeline_run_created
-| spath path=data.buildId output=buildId
-| spath path=data.pipelineName output=pipeline_name
-| spath path=data.status.completionTime output=pipeline_completion
-| spath path=data.status.state output=pipeline_state
-| eval pipeline_duration=if(pipeline_state="succeed" AND isnotnull(pipeline_completion), (strptime(pipeline_completion, "%Y-%m-%dT%H:%M:%S.000Z") - strptime(pipeline_run_created, "%Y-%m-%dT%H:%M:%S.000Z")), null)
-| table pipeline_run_created, buildId, pipeline_name, stack_name, user_pipeline_duration_seconds, pipeline_duration
-| where isnotnull(user_pipeline_duration_seconds)
+Successfully led the definition and publication of release conventions for Rust-based services within the Tekton/OpenShift/Harness-based CI/CD platform.
 
-index=your_index_name_here earliest=-1h latest=now | limit 50000
-| rename data.status.creationTime AS pipeline_run_created
-| rename data.buildId AS buildId
-| rename data.pipelineName AS pipeline_name
-| spath input=data.build.tasks{}
-| eval git_clone_state = mvindex(data.build.tasks{}.status.state, match(data.build.tasks{}.refName, "git-clone"))
-| eval git_clone_startTime = mvindex(data.build.tasks{}.status.startTime, match(data.build.tasks{}.refName, "git-clone"))
-| eval deployment_trigger_state = mvindex(data.build.tasks{}.status.state, match(data.build.tasks{}.refName, "deployment-trigger"))
-| eval deployment_trigger_completionTime = mvindex(data.build.tasks{}.status.completionTime, match(data.build.tasks{}.refName, "deployment-trigger"))
-| eval build_task_refName = mvindex(data.build.tasks{}.refName, match(data.build.tasks{}.refName, "java-gradle-build|npm-build"))
-| where git_clone_state="succeed" AND deployment_trigger_state="succeed" AND isnotnull(build_task_refName)
-| eval user_pipeline_duration_seconds = round(strptime(deployment_trigger_completionTime, "%Y-%m-%dT%H:%M:%S.%Q%Z") - strptime(git_clone_startTime, "%Y-%m-%dT%H:%M:%S.%Q%Z"))
-| eval stack_name = build_task_refName
-| eval pipeline_completionTime = data.status.completionTime
-| table pipeline_run_created, buildId, pipeline_name, stack_name, user_pipeline_duration_seconds, pipeline_completionTime
+Collaborated with Rust developers and the Artifactory platform team to align on metadata and publishing standards.
+
+Published the guidelines with support from platform governance and enabled frictionless onboarding for early Rust adopters.
+
+Actively reviewed and unblocked pull requests across CI/CD initiatives to ensure smooth progress across dependent teams.
+
+✅ 2. Financial Performance Goal
+SMART Goal:
+Adopt AI-powered development tools (Copilot, Assist AI, Devin) to improve coding, testing, and analysis efficiency, and evaluate their impact on development and QA workflows by June 30, with a target of 10–20% time savings in supported areas.
+
+First 6 Months Achievement:
+
+Integrated GitHub Copilot into daily development environments (VSCode/IntelliJ), reducing effort on repetitive code and boilerplate generation.
+
+Used Assist AI for build metric analysis and small dataset QA, cutting down manual analysis time from hours to minutes.
+
+Selected for early access to Devin, with work beginning in late June to explore further automation opportunities.
+
+Completed foundational AWS training as part of the E3 Hackathon and explored AWS QuickSight for faster data insights.
+
+Estimated early productivity gains equating to $2K–$5K in annualized savings per developer in relevant workflows.
+
+✅ 3. Risk & Controls Goal
+SMART Goal:
+Design and implement a long-term metrics retention mechanism for Tekton CI/CD build data and build observability dashboards to support performance analysis before and after the TaskHooks rollout, with full readiness by end of June.
+
+First 6 Months Achievement:
+
+Delivered an API and Splunk integration to persist build data in S3 beyond the 90-day default retention period, enabling historical analysis.
+
+Built 3 of 10 planned Grafana panels to monitor CPU/memory trends across OpenShift clusters in preparation for the TaskHooks rollout, which introduces additional pod and TaskRun load.
+
+Enabled better risk visibility and regression tracking for platform infrastructure changes.
+
+Targeted completion of remaining dashboards and pre-rollout validation by end of June to support safer deployment of TaskHooks in H2.
