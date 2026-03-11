@@ -1,296 +1,215 @@
-# Tekton Results – Proof of Concept (POC) Plan
+## **7. Implementation Steps (Updated Sections Only)**
 
-**Objective:**
-Evaluate **Tekton Results** as a scalable mechanism to offload **PipelineRun and TaskRun metadata from Kubernetes etcd** to an external database, improving cluster stability and performance in large-scale CI environments.
+### **Step 2 – Deploy and Configure PostgreSQL**
 
----
+The earlier step creating only a Kubernetes secret is **not sufficient**.
+Tekton Results requires a **running PostgreSQL instance, schema initialization, and API configuration**.
 
-# 1. Background
+#### 2.1 Deploy PostgreSQL
 
-Our current **OpenShift + Tekton CI environment** stores all **PipelineRun and TaskRun CRDs in etcd**. With approximately **1 million builds**, this creates:
+Deploy a PostgreSQL instance accessible from the cluster.
 
-* Large **etcd storage growth**
-* **API server latency**
-* Slower `kubectl` and Tekton queries
-* Operational risk if etcd grows excessively
-
-**Tekton Results** addresses this by:
-
-* Persisting run metadata in **PostgreSQL**
-* Providing a **Results API** to query historical runs
-* Allowing **garbage collection of completed runs** from etcd
-
----
-
-# 2. Target Architecture
+Example (POC only):
 
 ```
-Tekton Pipelines (PipelineRun / TaskRun)
-                │
-                ▼
-       Tekton Results Watcher
-                │
-                ▼
-         Tekton Results API
-                │
-                ▼
-           PostgreSQL
-                │
-                ▼
-         Optional Log Storage
-        (Loki / S3 / GCS)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tekton-results-postgres
+  namespace: tekton-results
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tekton-results-postgres
+  template:
+    metadata:
+      labels:
+        app: tekton-results-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:14
+        env:
+        - name: POSTGRES_USER
+          value: tekton
+        - name: POSTGRES_PASSWORD
+          value: tektonpw
+        - name: POSTGRES_DB
+          value: tekton_results
 ```
 
-Key idea:
-
-* **Active builds remain in Kubernetes**
-* **Completed builds are persisted to Results DB**
-* **CRDs can then be pruned from etcd**
-
----
-
-# 3. POC Goals
-
-The proof of concept will validate:
-
-1. Reduction in **etcd storage growth**
-2. Ability to **persist PipelineRun/TaskRun metadata**
-3. Performance of **querying historical build data**
-4. Scalability for **large build volumes**
-5. Integration with existing **Tekton pipelines**
-
----
-
-# 4. Environment Requirements
-
-### Cluster
-
-| Component        | Version |
-| ---------------- | ------- |
-| OpenShift        | 4.13+   |
-| Kubernetes       | 1.25+   |
-| Tekton Pipelines | 1.12+   |
-
-### Tekton Results
-
-| Component      | Version |
-| -------------- | ------- |
-| Tekton Results | v0.17+  |
-| PostgreSQL     | 13–15   |
-
----
-
-# 5. Infrastructure Requirements
-
-For a POC environment supporting up to **10k builds**:
-
-| Component          | Suggested Sizing |
-| ------------------ | ---------------- |
-| PostgreSQL CPU     | 4 cores          |
-| Memory             | 16 GB            |
-| Disk               | 200 GB SSD       |
-| Tekton Results API | 2 pods           |
-| Results Watcher    | 2 pods           |
-
-Estimated storage for production:
-
-| Builds           | Approx Storage |
-| ---------------- | -------------- |
-| 1 million builds | 40–80 GB       |
-
----
-
-# 6. POC Scope
-
-The POC will include:
-
-* Installation of **Tekton Results**
-* Integration with existing **Tekton pipelines**
-* Storage of **PipelineRun / TaskRun results**
-* Querying build results using CLI or API
-* Evaluating **cleanup strategy for etcd**
-
-The POC will **not modify existing pipelines**.
-
----
-
-# 7. Implementation Steps
-
-## Step 1 – Create Namespace
+Create a service for the database.
 
 ```
-kubectl create namespace tekton-results
-```
-
----
-
-## Step 2 – Deploy PostgreSQL
-
-Create database credentials.
-
-```
-kubectl create secret generic tekton-results-postgres \
- --from-literal=user=tekton \
- --from-literal=password=<password> \
+kubectl expose deployment tekton-results-postgres \
+ --name tekton-results-postgres \
+ --port 5432 \
+ --target-port 5432 \
  -n tekton-results
 ```
 
-Deploy a PostgreSQL instance accessible by the cluster.
+---
+
+### **2.2 Create Database Credentials Secret**
+
+Create credentials used by the Results API.
+
+```
+kubectl create secret generic tekton-results-postgres \
+ --from-literal=POSTGRES_USER=tekton \
+ --from-literal=POSTGRES_PASSWORD=<password> \
+ -n tekton-results
+```
 
 ---
 
-## Step 3 – Install Tekton Results
+### **2.3 Install Tekton Results**
+
+Install the Results components.
 
 ```
 kubectl apply -f \
 https://storage.googleapis.com/tekton-releases/results/latest/release.yaml
 ```
 
-This installs:
+Components installed:
 
-* Results API
-* Results Watcher
-* Retention policy controller
+* tekton-results-api
+* tekton-results-watcher
+* tekton-results-retention-policy-agent
 
 ---
 
-## Step 4 – Configure Results API
+### **2.4 Configure Results API to Use PostgreSQL**
 
-Create configuration for database connectivity.
+By default Tekton Results uses **SQLite**.
+It must be configured to use PostgreSQL.
 
-Example configuration:
+Create or patch the configuration:
 
 ```
-db_driver: postgres
-db_host: postgres
-db_port: 5432
-db_name: tekton_results
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tekton-results-api-config
+  namespace: tekton-results
+data:
+  db_driver: postgres
+  db_host: tekton-results-postgres
+  db_port: "5432"
+  db_name: tekton_results
 ```
 
-Apply configuration to the Results API deployment.
+Apply the configuration and restart the Results API deployment.
 
 ---
 
-## Step 5 – Start Results Watcher
+### **2.5 Initialize Database Schema**
 
-The watcher automatically observes:
+Before results can be stored, the database schema must be initialized.
 
-* `PipelineRun`
-* `TaskRun`
-
-and sends results to the **Results API**.
-
-No pipeline changes are required.
-
----
-
-## Step 6 – Validate Result Ingestion
-
-Trigger a pipeline.
-
-Verify results:
+Run migration command from the Results API container:
 
 ```
-tkn results list
+kubectl exec -it deployment/tekton-results-api \
+ -n tekton-results -- results migrate
 ```
 
-Or query via the Results API.
+This creates required tables such as:
 
-Confirm that:
-
-* PipelineRun metadata exists in PostgreSQL
-* Results appear via API queries
+* records
+* results
+* logs
 
 ---
 
-## Step 7 – Enable Pipeline Cleanup
+### **2.6 Verify Results API Connectivity**
 
-Once persistence is verified, completed runs can be removed from Kubernetes.
-
-Example cleanup:
+Check the Results API logs.
 
 ```
-kubectl delete pipelineruns \
---field-selector status.conditions[0].reason=Succeeded
+kubectl logs deployment/tekton-results-api -n tekton-results
 ```
 
-Alternatively use **Tekton Pruner** for automated retention.
+Expected output should confirm connection to PostgreSQL.
 
----
-
-# 8. Testing Plan
-
-The POC will test the following workloads:
-
-| Test                 | Volume   |
-| -------------------- | -------- |
-| Pipeline runs        | 10,000   |
-| Concurrent pipelines | 200      |
-| Retention in etcd    | 24 hours |
-
-Metrics to monitor:
-
-* etcd storage size
-* Kubernetes API latency
-* Results API latency
-* PostgreSQL storage growth
-
----
-
-# 9. Expected Benefits
-
-If successful, the solution should:
-
-* Reduce **etcd usage**
-* Improve **cluster performance**
-* Enable **long-term build history**
-* Provide scalable **CI metadata storage**
-
----
-
-# 10. Risks and Considerations
-
-| Risk                       | Mitigation                   |
-| -------------------------- | ---------------------------- |
-| Watcher load on API server | Horizontal scaling           |
-| Database growth            | Implement retention policies |
-| Query load from dashboards | Cache or limit queries       |
-
----
-
-# 11. Migration Strategy
-
-Existing builds will remain in etcd.
-
-Strategy:
+Example:
 
 ```
-Existing builds → remain until pruned
-New builds → stored in Tekton Results
+Connected to postgres database
 ```
 
-Gradual cleanup of historical CRDs will reduce etcd pressure.
+---
+
+### **2.7 Validate Watcher Ingestion**
+
+Trigger a sample pipeline run.
+
+Verify watcher activity:
+
+```
+kubectl logs deployment/tekton-results-watcher -n tekton-results
+```
+
+Expected log messages:
+
+```
+storing PipelineRun result
+```
 
 ---
 
-# 12. Next Steps
+## **Additional Configuration (Recommended)**
 
-1. Create **POC environment**
-2. Deploy **PostgreSQL**
-3. Install **Tekton Results**
-4. Run **sample pipelines**
-5. Evaluate **performance and storage**
-6. Define **production rollout strategy**
+### **Use Kustomize Overlay for Database Configuration**
+
+When customizing Tekton Results deployments, use **Kustomize overlays**.
+
+Example structure:
+
+```
+tekton-results/
+ ├─ base
+ └─ overlays
+     └─ postgres
+          kustomization.yaml
+          api-config-patch.yaml
+```
+
+Example overlay configuration:
+
+```
+resources:
+- ../../base
+
+patchesStrategicMerge:
+- api-config-patch.yaml
+```
+
+Apply using:
+
+```
+kubectl apply -k overlays/postgres
+```
 
 ---
 
-# 13. Success Criteria
+## **Production Considerations**
 
-The POC will be considered successful if:
+For large environments (~1M builds), avoid running PostgreSQL inside the cluster.
 
-* Pipeline results are reliably stored in PostgreSQL
-* etcd growth is reduced after CRD pruning
-* Historical pipeline data is accessible through Results API
-* The system supports scaling for **1M+ builds**
+Recommended options:
+
+* Managed PostgreSQL service
+* HA PostgreSQL cluster
+* Dedicated storage with backups
+
+Benefits:
+
+* High availability
+* Automated backups
+* Improved scalability
+* Reduced operational overhead
 
 ---
