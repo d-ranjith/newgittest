@@ -1,7 +1,296 @@
-Achievement
+# Tekton Results – Proof of Concept (POC) Plan
 
-Successfully created Grafana dashboards to monitor key CI/CD components across the Tekton/OpenShift environment — including Reusable PVC implementation, GitHub migration utility, and Tekton Taskhook usage segmented by technology stacks. Each dashboard was designed and delivered in alignment with the current state of the respective features, providing enhanced visibility into pipeline usage and operational performance.
+**Objective:**
+Evaluate **Tekton Results** as a scalable mechanism to offload **PipelineRun and TaskRun metadata from Kubernetes etcd** to an external database, improving cluster stability and performance in large-scale CI environments.
 
-Impact
+---
 
-These dashboards enabled real-time insights into adoption trends, performance metrics, and resource utilization across multiple engineering teams. The improved observability helped identify optimization opportunities and reduce debugging time for pipeline issues. Ongoing enhancements are planned for Q4 2025, with updated dashboards to be developed as new versions of these features are released to production — further strengthening our monitoring and reporting capabilities across the CI/CD ecosystem.
+# 1. Background
+
+Our current **OpenShift + Tekton CI environment** stores all **PipelineRun and TaskRun CRDs in etcd**. With approximately **1 million builds**, this creates:
+
+* Large **etcd storage growth**
+* **API server latency**
+* Slower `kubectl` and Tekton queries
+* Operational risk if etcd grows excessively
+
+**Tekton Results** addresses this by:
+
+* Persisting run metadata in **PostgreSQL**
+* Providing a **Results API** to query historical runs
+* Allowing **garbage collection of completed runs** from etcd
+
+---
+
+# 2. Target Architecture
+
+```
+Tekton Pipelines (PipelineRun / TaskRun)
+                │
+                ▼
+       Tekton Results Watcher
+                │
+                ▼
+         Tekton Results API
+                │
+                ▼
+           PostgreSQL
+                │
+                ▼
+         Optional Log Storage
+        (Loki / S3 / GCS)
+```
+
+Key idea:
+
+* **Active builds remain in Kubernetes**
+* **Completed builds are persisted to Results DB**
+* **CRDs can then be pruned from etcd**
+
+---
+
+# 3. POC Goals
+
+The proof of concept will validate:
+
+1. Reduction in **etcd storage growth**
+2. Ability to **persist PipelineRun/TaskRun metadata**
+3. Performance of **querying historical build data**
+4. Scalability for **large build volumes**
+5. Integration with existing **Tekton pipelines**
+
+---
+
+# 4. Environment Requirements
+
+### Cluster
+
+| Component        | Version |
+| ---------------- | ------- |
+| OpenShift        | 4.13+   |
+| Kubernetes       | 1.25+   |
+| Tekton Pipelines | 1.12+   |
+
+### Tekton Results
+
+| Component      | Version |
+| -------------- | ------- |
+| Tekton Results | v0.17+  |
+| PostgreSQL     | 13–15   |
+
+---
+
+# 5. Infrastructure Requirements
+
+For a POC environment supporting up to **10k builds**:
+
+| Component          | Suggested Sizing |
+| ------------------ | ---------------- |
+| PostgreSQL CPU     | 4 cores          |
+| Memory             | 16 GB            |
+| Disk               | 200 GB SSD       |
+| Tekton Results API | 2 pods           |
+| Results Watcher    | 2 pods           |
+
+Estimated storage for production:
+
+| Builds           | Approx Storage |
+| ---------------- | -------------- |
+| 1 million builds | 40–80 GB       |
+
+---
+
+# 6. POC Scope
+
+The POC will include:
+
+* Installation of **Tekton Results**
+* Integration with existing **Tekton pipelines**
+* Storage of **PipelineRun / TaskRun results**
+* Querying build results using CLI or API
+* Evaluating **cleanup strategy for etcd**
+
+The POC will **not modify existing pipelines**.
+
+---
+
+# 7. Implementation Steps
+
+## Step 1 – Create Namespace
+
+```
+kubectl create namespace tekton-results
+```
+
+---
+
+## Step 2 – Deploy PostgreSQL
+
+Create database credentials.
+
+```
+kubectl create secret generic tekton-results-postgres \
+ --from-literal=user=tekton \
+ --from-literal=password=<password> \
+ -n tekton-results
+```
+
+Deploy a PostgreSQL instance accessible by the cluster.
+
+---
+
+## Step 3 – Install Tekton Results
+
+```
+kubectl apply -f \
+https://storage.googleapis.com/tekton-releases/results/latest/release.yaml
+```
+
+This installs:
+
+* Results API
+* Results Watcher
+* Retention policy controller
+
+---
+
+## Step 4 – Configure Results API
+
+Create configuration for database connectivity.
+
+Example configuration:
+
+```
+db_driver: postgres
+db_host: postgres
+db_port: 5432
+db_name: tekton_results
+```
+
+Apply configuration to the Results API deployment.
+
+---
+
+## Step 5 – Start Results Watcher
+
+The watcher automatically observes:
+
+* `PipelineRun`
+* `TaskRun`
+
+and sends results to the **Results API**.
+
+No pipeline changes are required.
+
+---
+
+## Step 6 – Validate Result Ingestion
+
+Trigger a pipeline.
+
+Verify results:
+
+```
+tkn results list
+```
+
+Or query via the Results API.
+
+Confirm that:
+
+* PipelineRun metadata exists in PostgreSQL
+* Results appear via API queries
+
+---
+
+## Step 7 – Enable Pipeline Cleanup
+
+Once persistence is verified, completed runs can be removed from Kubernetes.
+
+Example cleanup:
+
+```
+kubectl delete pipelineruns \
+--field-selector status.conditions[0].reason=Succeeded
+```
+
+Alternatively use **Tekton Pruner** for automated retention.
+
+---
+
+# 8. Testing Plan
+
+The POC will test the following workloads:
+
+| Test                 | Volume   |
+| -------------------- | -------- |
+| Pipeline runs        | 10,000   |
+| Concurrent pipelines | 200      |
+| Retention in etcd    | 24 hours |
+
+Metrics to monitor:
+
+* etcd storage size
+* Kubernetes API latency
+* Results API latency
+* PostgreSQL storage growth
+
+---
+
+# 9. Expected Benefits
+
+If successful, the solution should:
+
+* Reduce **etcd usage**
+* Improve **cluster performance**
+* Enable **long-term build history**
+* Provide scalable **CI metadata storage**
+
+---
+
+# 10. Risks and Considerations
+
+| Risk                       | Mitigation                   |
+| -------------------------- | ---------------------------- |
+| Watcher load on API server | Horizontal scaling           |
+| Database growth            | Implement retention policies |
+| Query load from dashboards | Cache or limit queries       |
+
+---
+
+# 11. Migration Strategy
+
+Existing builds will remain in etcd.
+
+Strategy:
+
+```
+Existing builds → remain until pruned
+New builds → stored in Tekton Results
+```
+
+Gradual cleanup of historical CRDs will reduce etcd pressure.
+
+---
+
+# 12. Next Steps
+
+1. Create **POC environment**
+2. Deploy **PostgreSQL**
+3. Install **Tekton Results**
+4. Run **sample pipelines**
+5. Evaluate **performance and storage**
+6. Define **production rollout strategy**
+
+---
+
+# 13. Success Criteria
+
+The POC will be considered successful if:
+
+* Pipeline results are reliably stored in PostgreSQL
+* etcd growth is reduced after CRD pruning
+* Historical pipeline data is accessible through Results API
+* The system supports scaling for **1M+ builds**
+
+---
